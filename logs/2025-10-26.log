@@ -1,0 +1,9 @@
+2025-10-26T20:21:55.473Z [debug]: ⚡️ Server is running at http://192.168.56.1:5000
+2025-10-26T20:21:55.474Z [debug]: 📸 PhotoPin API available at /api/photos
+2025-10-26T20:21:55.474Z [debug]: ❤️  Health check at /api/photopin/health
+2025-10-26T20:22:31.719Z [debug]: ⚡️ Server is running at http://192.168.56.1:5000
+2025-10-26T20:22:31.720Z [debug]: 📸 PhotoPin API available at /api/photos
+2025-10-26T20:22:31.720Z [debug]: ❤️  Health check at /api/photopin/health
+2025-10-26T20:23:08.154Z [debug]: ⚡️ Server is running at http://192.168.56.1:5000
+2025-10-26T20:23:08.155Z [debug]: 📸 PhotoPin API available at /api/photos
+2025-10-26T20:23:08.156Z [debug]: ❤️  Health check at /api/photopin/health

@@ -1,0 +1,8 @@
+.idea/*
+src/environment/*
+node_modules/*
+client-side-js-example/node_modules/*
+dist/*
+//files with credential details 
+src/firebase-credentials.json
+.env
