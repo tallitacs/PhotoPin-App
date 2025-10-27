@@ -1,4 +1,4 @@
-import {Controller, HttpServer} from "../index";
+import { Controller, HttpServer } from "../controllers/index"; 
 import {RequestHandler} from "express";
 import {accountsService} from "../../../services/accounts-service";
 import {UserClientModel} from "../../../data/models/user/client/user-client-model";

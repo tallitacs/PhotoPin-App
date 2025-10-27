@@ -1,4 +1,4 @@
-import {Controller, HttpServer} from "../index";
+import { Controller, HttpServer } from "../../middleware/controllers/index";
 import {NextFunction, Request, RequestHandler, Response} from "express";
 import {productsService} from "../../../services/products-service";
 import {HttpResponseError} from "../../../utils/http-response-error";

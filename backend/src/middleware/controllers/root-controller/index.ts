@@ -1,5 +1,5 @@
-import {Controller, HttpServer} from "../index";
-import {RequestHandler} from "express";
+import { Controller, HttpServer } from "../controllers/index"; // Correct path
+import { RequestHandler } from "express";
 
 let counter:number = 1;
 
