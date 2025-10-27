@@ -8,4 +8,4 @@ src/firebase-credentials.json
 .env
 src/config/firebaseAdmin.ts
 backend/firebase-credentials.json
-973c2d1893db54f436ef6b8b8295c4f3a89d1674
+firebase-credentials.json
