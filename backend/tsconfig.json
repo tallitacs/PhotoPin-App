@@ -1,46 +1,19 @@
 {
   "compilerOptions": {
-    /* Language and Environment */
     "target": "ES2020",
-    "lib": ["ES2020"],
-    
-    /* Modules */
     "module": "commonjs",
-    "rootDir": "./src",
-    "moduleResolution": "node",
-    "typeRoots": ["./node_modules/@types"],
-    "resolveJsonModule": true,
-
-    /* JavaScript Support */
-    "allowJs": true,
-
-    /* Emit */
-    "declaration": false,
-    "sourceMap": true,
+    "lib": ["ES2020"],
     "outDir": "./dist",
-    "removeComments": true,
-
-    /* Interop Constraints */
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-
-    /* Type Checking */
+    "rootDir": "./src",
     "strict": true,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
-    "useUnknownInCatchVariables": false,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "skipLibCheck": true
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "logs",
-    "**/*.test.ts",
-    "**/*.spec.ts"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

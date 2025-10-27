@@ -1,177 +1,284 @@
-import { db, storage } from '../config/firebaseAdmin';
-import { Photo } from '../types/Photo';
-import { extractMetadata } from '../utils/photoMetadata';
+import { db, bucket } from '../config/firebaseAdmin';
+import { Photo, PhotoMetadata, PhotoQueryFilters } from '../@types/Photo';
+import { PhotoMetadataUtil } from '../utils/photoMetadata';
+import { v4 as uuidv4 } from 'uuid';
 
 export class PhotoService {
-  static async uploadPhoto(file: Express.Multer.File, userId: string, metadata: any): Promise<{ success: boolean; photoId?: string; photo?: Photo; error?: string }> {
-    try {
-      // Extract metadata from the image
-      const extractedMetadata = await extractMetadata(file);
-      
-      // Upload file to Firebase Storage
-      const bucket = storage.bucket();
-      const fileName = `photos/${userId}/${Date.now()}_${file.originalname.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      const fileUpload = bucket.file(fileName);
+  private static instance: PhotoService;
 
-      await fileUpload.save(file.buffer, {
+  public static getInstance(): PhotoService {
+    if (!PhotoService.instance) {
+      PhotoService.instance = new PhotoService();
+    }
+    return PhotoService.instance;
+  }
+
+  /**
+   * Upload photo with metadata extraction
+   */
+  async uploadPhoto(
+    userId: string, 
+    file: Express.Multer.File
+  ): Promise<{ photo: Photo | null; error: string | null }> {
+    try {
+      // Generate unique file name
+      const fileExtension = file.originalname.split('.').pop();
+      const fileName = `photos/${userId}/${uuidv4()}.${fileExtension}`;
+      const filePath = `thumbnails/${userId}/${uuidv4()}_thumb.jpg`;
+
+      // Extract metadata
+      const metadata = await PhotoMetadataUtil.extractMetadata(file.buffer, file.originalname);
+
+      // Upload original to Firebase Storage
+      const fileRef = bucket.file(fileName);
+      await fileRef.save(file.buffer, {
         metadata: {
           contentType: file.mimetype,
-        },
+          metadata: {
+            userId: userId,
+            originalName: file.originalname
+          }
+        }
       });
 
-      // Make the file public
-      await fileUpload.makePublic();
-      const downloadURL = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+      // Generate download URL
+      const [downloadURL] = await fileRef.getSignedUrl({
+        action: 'read',
+        expires: '03-01-2500' // Far future expiration
+      });
 
+      // Create thumbnail (simplified - you'd use Sharp here)
+      const thumbnailURL = await this.generateThumbnail(userId, file.buffer, filePath);
+
+      // Create photo document
       const photoData: Omit<Photo, 'id'> = {
         userId,
         fileName: file.originalname,
         filePath: fileName,
         downloadURL,
-        metadata: {
-          ...extractedMetadata,
-          timestamp: extractedMetadata.timestamp || new Date(),
-        },
-        title: metadata.title || file.originalname,
-        description: metadata.description || '',
-        tags: metadata.tags || [],
-        albumIds: metadata.albumIds || [],
-        createdAt: new Date(),
-        updatedAt: new Date()
+        thumbnailURL,
+        metadata,
+        location: metadata.gps ? {
+          latitude: metadata.gps.latitude,
+          longitude: metadata.gps.longitude
+        } : undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        tags: PhotoMetadataUtil.generateTags(metadata, file.originalname),
+        isPublic: false
       };
 
-      // Save to Firestore
       const docRef = await db.collection('photos').add(photoData);
-
+      
       const photo: Photo = {
         id: docRef.id,
         ...photoData
       };
 
-      return { 
-        success: true, 
-        photoId: docRef.id,
-        photo 
-      };
+      return { photo, error: null };
     } catch (error: any) {
-      console.error('Upload photo error:', error);
-      return { success: false, error: error.message };
+      console.error('Photo upload error:', error);
+      return { photo: null, error: 'Failed to upload photo' };
     }
   }
 
-  static async getUserPhotos(userId: string, options: { 
-    limit?: number; 
-    page?: number; 
-    year?: number;
-    location?: string;
-    tripId?: string;
-  } = {}): Promise<{ success: boolean; photos?: Photo[]; total?: number; page?: number; totalPages?: number; error?: string }> {
+  /**
+   * Generate thumbnail (placeholder implementation)
+   */
+  private async generateThumbnail(
+    userId: string, 
+    buffer: Buffer, 
+    filePath: string
+  ): Promise<string> {
+    // In a real implementation, you'd use Sharp to create thumbnails
+    // For now, return the original URL or a placeholder
     try {
-      let query: FirebaseFirestore.Query = db.collection('photos').where('userId', '==', userId);
+      const thumbRef = bucket.file(filePath);
+      // You would process the buffer with Sharp and save the thumbnail
+      // await thumbRef.save(processedBuffer, { ... });
+      
+      const [thumbnailURL] = await thumbRef.getSignedUrl({
+        action: 'read',
+        expires: '03-01-2500'
+      });
 
-      // Apply year filter
-      if (options.year) {
-        const startDate = new Date(options.year, 0, 1);
-        const endDate = new Date(options.year, 11, 31, 23, 59, 59);
-        query = query.where('metadata.timestamp', '>=', startDate)
-                     .where('metadata.timestamp', '<=', endDate);
+      return thumbnailURL;
+    } catch (error) {
+      console.error('Thumbnail generation error:', error);
+      // Return original URL if thumbnail generation fails
+      return '';
+    }
+  }
+
+  /**
+   * Get user photos with filtering
+   */
+  async getUserPhotos(
+    userId: string, 
+    filters: PhotoQueryFilters = {}
+  ): Promise<{ photos: Photo[]; total: number; error?: string }> {
+    try {
+      let query: FirebaseFirestore.Query = db.collection('photos')
+        .where('userId', '==', userId);
+
+      // Apply filters
+      if (filters.year) {
+        const startDate = new Date(filters.year, 0, 1).toISOString();
+        const endDate = new Date(filters.year + 1, 0, 1).toISOString();
+        query = query.where('metadata.takenAt', '>=', startDate)
+                     .where('metadata.takenAt', '<', endDate);
       }
+
+      if (filters.tripId) {
+        query = query.where('tripId', '==', filters.tripId);
+      }
+
+      if (filters.hasLocation) {
+        query = query.where('location', '!=', null);
+      }
+
+      if (filters.tags && filters.tags.length > 0) {
+        query = query.where('tags', 'array-contains-any', filters.tags);
+      }
+
+      // Get total count
+      const countQuery = query;
+      const totalSnapshot = await countQuery.get();
+      const total = totalSnapshot.size;
 
       // Apply pagination
-      const limit = options.limit || 50;
-      const page = options.page || 1;
-
-      // Get total count first
-      const countSnapshot = await query.get();
-      const total = countSnapshot.size;
-      const totalPages = Math.ceil(total / limit);
-
-      // Apply pagination to main query
-      const offset = (page - 1) * limit;
-      const snapshot = await query.orderBy('metadata.timestamp', 'desc')
-                                 .limit(limit)
-                                 .offset(offset)
-                                 .get();
-
-      const photos: Photo[] = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Photo));
-
-      return { 
-        success: true, 
-        photos,
-        total,
-        page,
-        totalPages
-      };
-    } catch (error: any) {
-      console.error('Get user photos error:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  static async getPhoto(userId: string, photoId: string): Promise<{ success: boolean; photo?: Photo; error?: string }> {
-    try {
-      const doc = await db.collection('photos').doc(photoId).get();
-      
-      if (!doc.exists) {
-        return { success: false, error: 'Photo not found' };
+      if (filters.limit) {
+        query = query.limit(filters.limit);
+      }
+      if (filters.offset) {
+        query = query.offset(filters.offset);
       }
 
-      const photoData = doc.data();
-      if (!photoData) {
-        return { success: false, error: 'Photo data is invalid' };
-      }
+      // Order by date taken or creation date
+      query = query.orderBy('metadata.takenAt', 'desc')
+                   .orderBy('createdAt', 'desc');
 
-      const photo = photoData as Photo;
-      
-      if (photo.userId !== userId) {
-        return { success: false, error: 'Unauthorized' };
-      }
+      const snapshot = await query.get();
+      const photos: Photo[] = [];
 
-      return { success: true, photo: { id: doc.id, ...photo } };
-    } catch (error: any) {
-      console.error('Get photo error:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  static async deletePhoto(userId: string, photoId: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      const doc = await db.collection('photos').doc(photoId).get();
-      
-      if (!doc.exists) {
-        return { success: false, error: 'Photo not found' };
-      }
-
-      const photoData = doc.data();
-      if (!photoData) {
-        return { success: false, error: 'Photo data is invalid' };
-      }
-
-      const photo = photoData as Photo;
-      
-      if (photo.userId !== userId) {
-        return { success: false, error: 'Unauthorized' };
-      }
-
-      // Delete from Storage
-      const bucket = storage.bucket();
-      const file = bucket.file(photo.filePath);
-      await file.delete().catch(error => {
-        console.warn('Could not delete file from storage:', error.message);
+      snapshot.forEach(doc => {
+        photos.push({
+          id: doc.id,
+          ...doc.data()
+        } as Photo);
       });
+
+      return { photos, total };
+    } catch (error: any) {
+      console.error('Error fetching photos:', error);
+      return { photos: [], total: 0, error: 'Failed to fetch photos' };
+    }
+  }
+
+  /**
+   * Get photo by ID
+   */
+  async getPhotoById(photoId: string, userId: string): Promise<{ photo: Photo | null; error?: string }> {
+    try {
+      const doc = await db.collection('photos').doc(photoId).get();
+      
+      if (!doc.exists) {
+        return { photo: null, error: 'Photo not found' };
+      }
+
+      const photo = { id: doc.id, ...doc.data() } as Photo;
+
+      // Check ownership
+      if (photo.userId !== userId) {
+        return { photo: null, error: 'Access denied' };
+      }
+
+      return { photo };
+    } catch (error: any) {
+      console.error('Error fetching photo:', error);
+      return { photo: null, error: 'Failed to fetch photo' };
+    }
+  }
+
+  /**
+   * Delete photo
+   */
+  async deletePhoto(photoId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const photoDoc = await db.collection('photos').doc(photoId).get();
+      
+      if (!photoDoc.exists) {
+        return { success: false, error: 'Photo not found' };
+      }
+
+      const photo = photoDoc.data() as Photo;
+
+      // Verify ownership
+      if (photo.userId !== userId) {
+        return { success: false, error: 'Access denied' };
+      }
+
+      // Delete from storage
+      const fileRef = bucket.file(photo.filePath);
+      await fileRef.delete();
+
+      // Delete thumbnail if exists
+      if (photo.thumbnailURL) {
+        const thumbPath = photo.thumbnailURL.split('/').pop();
+        if (thumbPath) {
+          const thumbRef = bucket.file(`thumbnails/${userId}/${thumbPath}`);
+          await thumbRef.delete().catch(() => {}); // Ignore errors for thumbnails
+        }
+      }
 
       // Delete from Firestore
       await db.collection('photos').doc(photoId).delete();
 
       return { success: true };
     } catch (error: any) {
-      console.error('Delete photo error:', error);
-      return { success: false, error: error.message };
+      console.error('Error deleting photo:', error);
+      return { success: false, error: 'Failed to delete photo' };
     }
   }
 
-  // Add other methods as needed...
+  /**
+   * Update photo metadata
+   */
+  async updatePhoto(
+    photoId: string, 
+    userId: string, 
+    updates: Partial<Photo>
+  ): Promise<{ photo: Photo | null; error?: string }> {
+    try {
+      const photoDoc = await db.collection('photos').doc(photoId).get();
+      
+      if (!photoDoc.exists) {
+        return { photo: null, error: 'Photo not found' };
+      }
+
+      const currentPhoto = photoDoc.data() as Photo;
+
+      // Verify ownership
+      if (currentPhoto.userId !== userId) {
+        return { photo: null, error: 'Access denied' };
+      }
+
+      // Remove fields that shouldn't be updated
+      const { id, userId: _, createdAt, ...allowedUpdates } = updates;
+      allowedUpdates.updatedAt = new Date().toISOString();
+
+      await db.collection('photos').doc(photoId).update(allowedUpdates);
+
+      // Get updated photo
+      const updatedDoc = await db.collection('photos').doc(photoId).get();
+      const updatedPhoto = { id: updatedDoc.id, ...updatedDoc.data() } as Photo;
+
+      return { photo: updatedPhoto };
+    } catch (error: any) {
+      console.error('Error updating photo:', error);
+      return { photo: null, error: 'Failed to update photo' };
+    }
+  }
 }
+
+export const photoService = PhotoService.getInstance();

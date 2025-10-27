@@ -1,85 +1,80 @@
-    import dotenv from 'dotenv';
-    dotenv.config();
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import dotenv from 'dotenv';
 
-    // The rest of your imports
-    import express, { Express } from 'express';
-    import cors from 'cors';
-    import { log } from "./utils/logger";
-    import { myIPv4 } from "./utils/ipv4";
+// Load environment variables
+dotenv.config();
 
-    // Import config AFTER dotenv.config() has run
-    import './config/firebaseAdmin';
+// Import routes
+import { photoRoutes } from './routes/photoRoutes';
+import { tripRoutes } from './routes/tripRoutes';
+import { authRoutes } from './routes/authRoutes';
 
-    // Import middleware
-    import { AuthMiddleware } from "./middleware/authMiddleware";
-    import { upload, handleUploadError } from "./middleware/upload";
+// Import middleware
+import { handleUploadError } from './middleware/upload';
+import { errorHandler } from './middleware/errorHandler';
 
-    // Import controllers
-    import { PhotoController } from "./middleware/controllers/PhotoController";
+const app = express();
+const PORT = process.env.PORT || 5000;
 
-    const app: Express = express();
-    const port = process.env.PORT || 5000; // Using your PORT from .env
+// Security middleware
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
-    // Middleware
-    app.use(cors({
-      origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-      credentials: true
-    }));
-    app.use(express.json({ limit: process.env.MAX_FILE_SIZE || '50mb' }));
-    app.use(express.urlencoded({ extended: true, limit: process.env.MAX_FILE_SIZE || '50mb' }));
+// CORS configuration
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  credentials: true
+}));
 
-    // Health check
-    app.get('/api/health', (req, res) => {
-      res.json({
-        success: true,
-        status: 'OK',
-        message: 'PhotoPin Backend is running!',
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV
-      });
-    });
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'), // limit each IP to 100 requests per windowMs
+  message: {
+    success: false,
+    error: 'Too many requests, please try again later.'
+  }
+});
+app.use(limiter);
 
-    // Photo routes
-    app.post('/api/photos/upload', AuthMiddleware.authenticate, upload.single('photo'), handleUploadError, PhotoController.uploadPhoto);
-    app.post('/api/photos/multiple', AuthMiddleware.authenticate, upload.array('photos', 10), handleUploadError, PhotoController.uploadMultiplePhotos);
-    app.get('/api/photos', AuthMiddleware.authenticate, PhotoController.getUserPhotos);
-    app.get('/api/photos/:photoId', AuthMiddleware.authenticate, PhotoController.getPhoto);
-    app.delete('/api/photos/:photoId', AuthMiddleware.authenticate, PhotoController.deletePhoto);
-    app.put('/api/photos/:photoId', AuthMiddleware.authenticate, PhotoController.updatePhotoMetadata);
+// Body parsing middleware
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-    // Trip routes
-    app.post('/api/trips/auto-group', AuthMiddleware.authenticate, PhotoController.autoGroupPhotos);
-    app.get('/api/trips', AuthMiddleware.authenticate, PhotoController.getUserTrips);
-    app.post('/api/trips', AuthMiddleware.authenticate, PhotoController.createTrip);
+// Routes
+app.use('/api/photos', photoRoutes);
+app.use('/api/trips', tripRoutes);
+app.use('/api/auth', authRoutes);
 
-    // Map routes
-    app.get('/api/map/pins', AuthMiddleware.authenticate, PhotoController.getMapPins);
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'PhotoPin API is running',
+    timestamp: new Date().toISOString()
+  });
+});
 
-    // Timeline routes
-    app.get('/api/timeline', AuthMiddleware.authenticate, PhotoController.getTimeline);
+// Error handling middleware
+app.use(handleUploadError);
+app.use(errorHandler);
 
-    // Search routes
-    app.get('/api/search/photos', AuthMiddleware.authenticate, PhotoController.searchPhotos);
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Route not found'
+  });
+});
 
-    // Server info
-    app.get('/api/info', AuthMiddleware.authenticate, (req, res) => {
-      res.json({
-        success: true,
-        server: {
-          name: 'PhotoPin Backend',
-          version: '1.0.0',
-          environment: process.env.NODE_ENV,
-          maxFileSize: process.env.MAX_FILE_SIZE
-        },
-        user: (req as any).user
-      });
-    });
+app.listen(PORT, () => {
+  console.log(`🚀 PhotoPin backend server running on port ${PORT}`);
+  console.log(`📸 Environment: ${process.env.NODE_ENV}`);
+  console.log(`🌐 CORS enabled for: ${process.env.CORS_ORIGIN}`);
+});
 
-    app.listen(port, () => {
-      log(`🚀 Backend server running at http://${myIPv4()}:${port}`);
-      log(`📸 Photo endpoints available at /api/photos`);
-      log(`❤️  Health check at /api/health`);
-      log(`🌍 Environment: ${process.env.NODE_ENV}`);
-    });
-    
-
+export default app;

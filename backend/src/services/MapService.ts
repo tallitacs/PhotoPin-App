@@ -1,41 +1,104 @@
-import { Photo } from '../types/Photo';
-
-export interface MapPin {
-  id: string;
-  latitude: number;
-  longitude: number;
-  photoIds: string[];
-  locationName: string;
-  photoCount: number;
-}
+import { Photo } from '../@types/Photo';
+import { Trip } from '../@types/Trip';
 
 export class MapService {
-  static async getMapPins(userId: string): Promise<{ success: boolean; pins?: MapPin[]; error?: string }> {
-    try {
-      // Mock implementation - in real app, this would query your database
-      const mockPins: MapPin[] = [
-        {
-          id: '1',
-          latitude: 53.3498,
-          longitude: -6.2603,
-          photoIds: ['1', '2'],
-          locationName: 'Dublin',
-          photoCount: 2
-        },
-        {
-          id: '2',
-          latitude: 51.5074,
-          longitude: -0.1278,
-          photoIds: ['3'],
-          locationName: 'London',
-          photoCount: 1
-        }
-      ];
+  private static instance: MapService;
 
-      return { success: true, pins: mockPins };
-    } catch (error: any) {
-      console.error('Get map pins error:', error);
-      return { success: false, error: error.message };
+  public static getInstance(): MapService {
+    if (!MapService.instance) {
+      MapService.instance = new MapService();
     }
+    return MapService.instance;
+  }
+
+  /**
+   * Generate map markers from photos
+   */
+  generatePhotoMarkers(photos: Photo[]): any[] {
+    return photos
+      .filter(photo => photo.location)
+      .map(photo => ({
+        id: photo.id,
+        position: {
+          lat: photo.location!.latitude,
+          lng: photo.location!.longitude
+        },
+        title: photo.fileName,
+        photoURL: photo.thumbnailURL || photo.downloadURL,
+        date: photo.metadata.takenAt || photo.createdAt
+      }));
+  }
+
+  /**
+   * Generate trip boundaries for map
+   */
+  generateTripBoundaries(trips: Trip[]): any[] {
+    return trips.map(trip => ({
+      id: trip.id,
+      name: trip.name,
+      bounds: trip.location.boundingBox,
+      center: trip.location.center,
+      photoCount: trip.photoIds.length
+    }));
+  }
+
+  /**
+   * Cluster nearby markers
+   */
+  clusterMarkers(markers: any[], clusterRadius: number = 50): any[] {
+    const clusters: any[] = [];
+    const processed = new Set();
+
+    markers.forEach(marker => {
+      if (processed.has(marker.id)) return;
+
+      const nearby = markers.filter(other => 
+        !processed.has(other.id) &&
+        this.calculateDistance(marker.position, other.position) <= clusterRadius
+      );
+
+      if (nearby.length === 1) {
+        clusters.push(marker);
+      } else {
+        clusters.push(this.createCluster(nearby));
+      }
+
+      nearby.forEach(m => processed.add(m.id));
+    });
+
+    return clusters;
+  }
+
+  private createCluster(markers: any[]): any {
+    const center = {
+      lat: markers.reduce((sum, m) => sum + m.position.lat, 0) / markers.length,
+      lng: markers.reduce((sum, m) => sum + m.position.lng, 0) / markers.length
+    };
+
+    return {
+      id: `cluster-${markers[0].id}`,
+      position: center,
+      isCluster: true,
+      count: markers.length,
+      markers: markers
+    };
+  }
+
+  private calculateDistance(pos1: any, pos2: any): number {
+    const R = 6371; // Earth's radius in km
+    const dLat = this.deg2rad(pos2.lat - pos1.lat);
+    const dLon = this.deg2rad(pos2.lng - pos1.lng);
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(this.deg2rad(pos1.lat)) * Math.cos(this.deg2rad(pos2.lat)) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    return R * c;
+  }
+
+  private deg2rad(deg: number): number {
+    return deg * (Math.PI/180);
   }
 }
+
+export const mapService = MapService.getInstance();

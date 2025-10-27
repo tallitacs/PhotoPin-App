@@ -1,25 +1,51 @@
+export interface PhotoMetadata {
+  width: number;
+  height: number;
+  size: number;
+  format: string;
+  takenAt?: string;
+  cameraMake?: string;
+  cameraModel?: string;
+  gps?: {
+    latitude: number;
+    longitude: number;
+    altitude?: number;
+  };
+}
+
 export interface Photo {
   id: string;
   userId: string;
   fileName: string;
   filePath: string;
   downloadURL: string;
+  thumbnailURL?: string;
   metadata: PhotoMetadata;
-  title?: string;
-  description?: string;
-  tags?: string[];
-  albumIds?: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  location?: GeoPoint;
+  createdAt: string;
+  updatedAt: string;
+  tripId?: string;
+  tags: string[];
+  isPublic: boolean;
 }
 
-export interface PhotoMetadata {
-  latitude?: number;
-  longitude?: number;
-  timestamp: Date;
-  cameraMake?: string;
-  cameraModel?: string;
-  width?: number;
-  height?: number;
-  locationName?: string;
+export interface GeoPoint {
+  latitude: number;
+  longitude: number;
+}
+
+export interface PhotoUploadResponse {
+  success: boolean;
+  photo?: Photo;
+  error?: string;
+}
+
+export interface PhotoQueryFilters {
+  year?: number;
+  month?: number;
+  tripId?: string;
+  hasLocation?: boolean;
+  tags?: string[];
+  limit?: number;
+  offset?: number;
 }
