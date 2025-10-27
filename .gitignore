@@ -10,3 +10,4 @@ src/config/firebaseAdmin.ts
 backend/firebase-credentials.json
 firebase-credentials.json
 src/firebase/config.js
+firebaseAdmin.ts
