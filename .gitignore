@@ -6,3 +6,4 @@ dist/*
 //files with credential details 
 src/firebase-credentials.json
 .env
+firebaseAdmin.ts
