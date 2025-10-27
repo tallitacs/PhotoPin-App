@@ -1,79 +1,85 @@
-import express, { Express } from 'express';
-import cors from 'cors';
-import { log } from "./utils/logger";
-import { myIPv4 } from "./utils/ipv4";
+    import dotenv from 'dotenv';
+    dotenv.config();
 
-// Import config first to initialize Firebase Admin
-import './config/firebaseAdmin';
+    // The rest of your imports
+    import express, { Express } from 'express';
+    import cors from 'cors';
+    import { log } from "./utils/logger";
+    import { myIPv4 } from "./utils/ipv4";
 
-// Import middleware
-import { AuthMiddleware } from "./middleware/authMiddleware";
-import { upload, handleUploadError } from "./middleware/upload";
+    // Import config AFTER dotenv.config() has run
+    import './config/firebaseAdmin';
 
-// Import controllers
-import { PhotoController } from "./controllers/PhotoController";
+    // Import middleware
+    import { AuthMiddleware } from "./middleware/authMiddleware";
+    import { upload, handleUploadError } from "./middleware/upload";
 
-const app: Express = express();
-const port = process.env.PORT || 5000; // Using your PORT from .env
+    // Import controllers
+    import { PhotoController } from "./middleware/controllers/PhotoController";
 
-// Middleware
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
-}));
-app.use(express.json({ limit: process.env.MAX_FILE_SIZE || '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: process.env.MAX_FILE_SIZE || '50mb' }));
+    const app: Express = express();
+    const port = process.env.PORT || 5000; // Using your PORT from .env
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    success: true,
-    status: 'OK', 
-    message: 'PhotoPin Backend is running!',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
-  });
-});
+    // Middleware
+    app.use(cors({
+      origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+      credentials: true
+    }));
+    app.use(express.json({ limit: process.env.MAX_FILE_SIZE || '50mb' }));
+    app.use(express.urlencoded({ extended: true, limit: process.env.MAX_FILE_SIZE || '50mb' }));
 
-// Photo routes
-app.post('/api/photos/upload', AuthMiddleware.authenticate, upload.single('photo'), handleUploadError, PhotoController.uploadPhoto);
-app.post('/api/photos/multiple', AuthMiddleware.authenticate, upload.array('photos', 10), handleUploadError, PhotoController.uploadMultiplePhotos);
-app.get('/api/photos', AuthMiddleware.authenticate, PhotoController.getPhotos);
-app.get('/api/photos/:photoId', AuthMiddleware.authenticate, PhotoController.getPhoto);
-app.delete('/api/photos/:photoId', AuthMiddleware.authenticate, PhotoController.deletePhoto);
-app.put('/api/photos/:photoId', AuthMiddleware.authenticate, PhotoController.updatePhotoMetadata);
+    // Health check
+    app.get('/api/health', (req, res) => {
+      res.json({
+        success: true,
+        status: 'OK',
+        message: 'PhotoPin Backend is running!',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV
+      });
+    });
 
-// Trip routes
-app.post('/api/trips/auto-group', AuthMiddleware.authenticate, PhotoController.autoGroupPhotos);
-app.get('/api/trips', AuthMiddleware.authenticate, PhotoController.getUserTrips);
-app.post('/api/trips', AuthMiddleware.authenticate, PhotoController.createTrip);
+    // Photo routes
+    app.post('/api/photos/upload', AuthMiddleware.authenticate, upload.single('photo'), handleUploadError, PhotoController.uploadPhoto);
+    app.post('/api/photos/multiple', AuthMiddleware.authenticate, upload.array('photos', 10), handleUploadError, PhotoController.uploadMultiplePhotos);
+    app.get('/api/photos', AuthMiddleware.authenticate, PhotoController.getUserPhotos);
+    app.get('/api/photos/:photoId', AuthMiddleware.authenticate, PhotoController.getPhoto);
+    app.delete('/api/photos/:photoId', AuthMiddleware.authenticate, PhotoController.deletePhoto);
+    app.put('/api/photos/:photoId', AuthMiddleware.authenticate, PhotoController.updatePhotoMetadata);
 
-// Map routes
-app.get('/api/map/pins', AuthMiddleware.authenticate, PhotoController.getMapPins);
+    // Trip routes
+    app.post('/api/trips/auto-group', AuthMiddleware.authenticate, PhotoController.autoGroupPhotos);
+    app.get('/api/trips', AuthMiddleware.authenticate, PhotoController.getUserTrips);
+    app.post('/api/trips', AuthMiddleware.authenticate, PhotoController.createTrip);
 
-// Timeline routes
-app.get('/api/timeline', AuthMiddleware.authenticate, PhotoController.getTimeline);
+    // Map routes
+    app.get('/api/map/pins', AuthMiddleware.authenticate, PhotoController.getMapPins);
 
-// Search routes
-app.get('/api/search/photos', AuthMiddleware.authenticate, PhotoController.searchPhotos);
+    // Timeline routes
+    app.get('/api/timeline', AuthMiddleware.authenticate, PhotoController.getTimeline);
 
-// Server info
-app.get('/api/info', AuthMiddleware.authenticate, (req, res) => {
-  res.json({
-    success: true,
-    server: {
-      name: 'PhotoPin Backend',
-      version: '1.0.0',
-      environment: process.env.NODE_ENV,
-      maxFileSize: process.env.MAX_FILE_SIZE
-    },
-    user: (req as any).user
-  });
-});
+    // Search routes
+    app.get('/api/search/photos', AuthMiddleware.authenticate, PhotoController.searchPhotos);
 
-app.listen(port, () => {
-  log(`🚀 Backend server running at http://${myIPv4()}:${port}`);
-  log(`📸 Photo endpoints available at /api/photos`);
-  log(`❤️  Health check at /api/health`);
-  log(`🌍 Environment: ${process.env.NODE_ENV}`);
-});
+    // Server info
+    app.get('/api/info', AuthMiddleware.authenticate, (req, res) => {
+      res.json({
+        success: true,
+        server: {
+          name: 'PhotoPin Backend',
+          version: '1.0.0',
+          environment: process.env.NODE_ENV,
+          maxFileSize: process.env.MAX_FILE_SIZE
+        },
+        user: (req as any).user
+      });
+    });
+
+    app.listen(port, () => {
+      log(`🚀 Backend server running at http://${myIPv4()}:${port}`);
+      log(`📸 Photo endpoints available at /api/photos`);
+      log(`❤️  Health check at /api/health`);
+      log(`🌍 Environment: ${process.env.NODE_ENV}`);
+    });
+    
+

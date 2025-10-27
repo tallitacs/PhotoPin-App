@@ -1,16 +1,35 @@
-import { db, storage } from '../config/firebaseAdmin';
-import { Photo } from '../types/Photo';
-import { extractMetadata } from '../utils/photoMetadata';
+// src/middleware/controllers/PhotoController.ts
+import { db, storage } from '../../config/firebaseAdmin';
+import { Photo } from '../../@types/Photo'; 
+import { extractMetadata } from '../../utils/photoMetadata';
+import { Request, Response } from 'express'; 
 
-export class PhotoService {
-  static async uploadPhoto(file: Express.Multer.File, userId: string, metadata: any): Promise<{ success: boolean; photoId?: string; photo?: Photo; error?: string }> {
+// A custom interface to add the 'user' property from your AuthMiddleware
+interface AuthenticatedRequest extends Request {
+  user?: { uid: string; email: string };
+}
+
+export class PhotoController {
+
+  static async uploadPhoto(req: AuthenticatedRequest, res: Response) {
     try {
+      // Extract data from the request object
+      const file = req.file;
+      const user = req.user;
+      const metadata = req.body;
+
+      if (!file) {
+        return res.status(400).json({ success: false, error: 'No file uploaded.' });
+      }
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized.' });
+      }
+
       // Extract metadata from the image
       const extractedMetadata = await extractMetadata(file);
       
-      // Upload file to Firebase Storage
       const bucket = storage.bucket();
-      const fileName = `photos/${userId}/${Date.now()}_${file.originalname.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const fileName = `photos/${user.uid}/${Date.now()}_${file.originalname.replace(/[^a-zA-Z0-9.]/g, '_')}`;
       const fileUpload = bucket.file(fileName);
 
       await fileUpload.save(file.buffer, {
@@ -19,12 +38,11 @@ export class PhotoService {
         },
       });
 
-      // Make the file public
       await fileUpload.makePublic();
       const downloadURL = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
 
       const photoData: Omit<Photo, 'id'> = {
-        userId,
+        userId: user.uid,
         fileName: file.originalname,
         filePath: fileName,
         downloadURL,
@@ -40,7 +58,6 @@ export class PhotoService {
         updatedAt: new Date()
       };
 
-      // Save to Firestore
       const docRef = await db.collection('photos').add(photoData);
 
       const photo: Photo = {
@@ -48,46 +65,46 @@ export class PhotoService {
         ...photoData
       };
 
-      return { 
+      // Send response
+      return res.status(201).json({ 
         success: true, 
         photoId: docRef.id,
         photo 
-      };
+      });
     } catch (error: any) {
       console.error('Upload photo error:', error);
-      return { success: false, error: error.message };
+      return res.status(500).json({ success: false, error: error.message });
     }
   }
 
-  static async getUserPhotos(userId: string, options: { 
-    limit?: number; 
-    page?: number; 
-    year?: number;
-    location?: string;
-    tripId?: string;
-  } = {}): Promise<{ success: boolean; photos?: Photo[]; total?: number; page?: number; totalPages?: number; error?: string }> {
+  static async getUserPhotos(req: AuthenticatedRequest, res: Response) {
     try {
-      let query: FirebaseFirestore.Query = db.collection('photos').where('userId', '==', userId);
+      const user = req.user;
+      // Extract options from query parameters
+      const options = req.query; 
 
-      // Apply year filter
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized.' });
+      }
+
+      let query: FirebaseFirestore.Query = db.collection('photos').where('userId', '==', user.uid);
+
       if (options.year) {
-        const startDate = new Date(options.year, 0, 1);
-        const endDate = new Date(options.year, 11, 31, 23, 59, 59);
+        const year = parseInt(options.year as string);
+        const startDate = new Date(year, 0, 1);
+        const endDate = new Date(year, 11, 31, 23, 59, 59);
         query = query.where('metadata.timestamp', '>=', startDate)
                      .where('metadata.timestamp', '<=', endDate);
       }
 
-      // Apply pagination
-      const limit = options.limit || 50;
-      const page = options.page || 1;
+      const limit = parseInt(options.limit as string) || 50;
+      const page = parseInt(options.page as string) || 1;
 
-      // Get total count first
       const countSnapshot = await query.get();
       const total = countSnapshot.size;
       const totalPages = Math.ceil(total / limit);
-
-      // Apply pagination to main query
       const offset = (page - 1) * limit;
+
       const snapshot = await query.orderBy('metadata.timestamp', 'desc')
                                  .limit(limit)
                                  .offset(offset)
@@ -98,101 +115,119 @@ export class PhotoService {
         ...doc.data()
       } as Photo));
 
-      return { 
+      // Send response
+      return res.json({ 
         success: true, 
         photos,
         total,
         page,
         totalPages
-      };
+      });
     } catch (error: any) {
       console.error('Get user photos error:', error);
-      return { success: false, error: error.message };
+      return res.status(500).json({ success: false, error: error.message });
     }
   }
 
-  static async getPhoto(userId: string, photoId: string): Promise<{ success: boolean; photo?: Photo; error?: string }> {
+  static async getPhoto(req: AuthenticatedRequest, res: Response) {
     try {
+      const user = req.user;
+      // Extract photoId from URL parameters
+      const { photoId } = req.params; 
+
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized.' });
+      }
+
       const doc = await db.collection('photos').doc(photoId).get();
       
       if (!doc.exists) {
-        return { success: false, error: 'Photo not found' };
+        return res.status(404).json({ success: false, error: 'Photo not found' });
       }
 
-      const photoData = doc.data();
+      const photoData = doc.data() as Photo;
       if (!photoData) {
-        return { success: false, error: 'Photo data is invalid' };
+        return res.status(404).json({ success: false, error: 'Photo data is invalid' });
       }
-
-      const photo = photoData as Photo;
       
-      if (photo.userId !== userId) {
-        return { success: false, error: 'Unauthorized' };
+      if (photoData.userId !== user.uid) {
+        return res.status(403).json({ success: false, error: 'Unauthorized' });
       }
 
-      return { success: true, photo: { id: doc.id, ...photo } };
+      // Send response
+      return res.json({ success: true, photo: { id: doc.id, ...photoData } });
     } catch (error: any) {
       console.error('Get photo error:', error);
-      return { success: false, error: error.message };
+      return res.status(500).json({ success: false, error: error.message });
     }
   }
 
-  static async deletePhoto(userId: string, photoId: string): Promise<{ success: boolean; error?: string }> {
+  static async deletePhoto(req: AuthenticatedRequest, res: Response) {
     try {
+      const user = req.user;
+      const { photoId } = req.params;
+
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized.' });
+      }
+
       const doc = await db.collection('photos').doc(photoId).get();
       
       if (!doc.exists) {
-        return { success: false, error: 'Photo not found' };
+        return res.status(404).json({ success: false, error: 'Photo not found' });
       }
 
-      const photoData = doc.data();
-      if (!photoData) {
-        return { success: false, error: 'Photo data is invalid' };
+      const photo = doc.data() as Photo;
+      if (!photo) {
+        return res.status(404).json({ success: false, error: 'Photo data is invalid' });
       }
-
-      const photo = photoData as Photo;
       
-      if (photo.userId !== userId) {
-        return { success: false, error: 'Unauthorized' };
+      if (photo.userId !== user.uid) {
+        return res.status(403).json({ success: false, error: 'Unauthorized' });
       }
 
-      // Delete from Storage
       const bucket = storage.bucket();
       const file = bucket.file(photo.filePath);
       await file.delete().catch(error => {
         console.warn('Could not delete file from storage:', error.message);
       });
 
-      // Delete from Firestore
       await db.collection('photos').doc(photoId).delete();
 
-      return { success: true };
+      // Send response
+      return res.json({ success: true });
     } catch (error: any) {
       console.error('Delete photo error:', error);
-      return { success: false, error: error.message };
+      return res.status(500).json({ success: false, error: error.message });
     }
   }
 
-  static async updatePhotoMetadata(userId: string, photoId: string, updates: any): Promise<{ success: boolean; photo?: Photo; error?: string }> {
+  static async updatePhotoMetadata(req: AuthenticatedRequest, res: Response) {
     try {
+      const user = req.user;
+      const { photoId } = req.params;
+      // Extract updates from request body
+      const updates = req.body; 
+
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized.' });
+      }
+
       const doc = await db.collection('photos').doc(photoId).get();
       
       if (!doc.exists) {
-        return { success: false, error: 'Photo not found' };
+        return res.status(404).json({ success: false, error: 'Photo not found' });
       }
 
-      const photoData = doc.data();
-      if (!photoData) {
-        return { success: false, error: 'Photo data is invalid' };
+      const photo = doc.data() as Photo;
+      if (!photo) {
+        return res.status(404).json({ success: false, error: 'Photo data is invalid' });
       }
-
-      const photo = photoData as Photo;
       
-      if (photo.userId !== userId) {
-        return { success: false, error: 'Unauthorized' };
+      if (photo.userId !== user.uid) {
+        return res.status(403).json({ success: false, error: 'Unauthorized' });
       }
 
-      // Update the photo in Firestore
       const updateData = {
         ...updates,
         updatedAt: new Date()
@@ -200,74 +235,74 @@ export class PhotoService {
 
       await db.collection('photos').doc(photoId).update(updateData);
 
-      // Get the updated photo
       const updatedDoc = await db.collection('photos').doc(photoId).get();
       const updatedPhoto = {
         id: updatedDoc.id,
         ...updatedDoc.data()
       } as Photo;
 
-      return { success: true, photo: updatedPhoto };
+      // Send response
+      return res.json({ success: true, photo: updatedPhoto });
     } catch (error: any) {
       console.error('Update photo metadata error:', error);
-      return { success: false, error: error.message };
+      return res.status(500).json({ success: false, error: error.message });
     }
   }
 
-  static async getPhotosByLocation(userId: string, location: string, options: { limit?: number; page?: number } = {}): Promise<{ success: boolean; photos?: Photo[]; total?: number; error?: string }> {
+  static async getPhotosByLocation(req: AuthenticatedRequest, res: Response) {
     try {
-      // For now, we'll filter client-side since Firestore doesn't have built-in text search
-      const result = await this.getUserPhotos(userId, { limit: 1000 });
-      
-      if (!result.success || !result.photos) {
-        return result;
+      const user = req.user;
+      const { location } = req.query;
+
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized.' });
+      }
+      if (!location) {
+        return res.status(400).json({ success: false, error: 'Location query parameter is required.' });
+      }
+
+      // This is a simple text search, not a geo-query.
+      // For real geo-queries, you'd need a different database structure or a third-party service.
+      const allPhotosResult = await this.getAllUserPhotos(user.uid);
+      if (!allPhotosResult.success || !allPhotosResult.photos) {
+        return res.status(500).json(allPhotosResult);
       }
 
       // Filter photos by location name (case-insensitive)
-      const filteredPhotos = result.photos.filter(photo => 
-        photo.metadata.locationName?.toLowerCase().includes(location.toLowerCase())
+      const filteredPhotos = allPhotosResult.photos.filter(photo => 
+        photo.metadata.locationName?.toLowerCase().includes((location as string).toLowerCase())
       );
 
-      // Apply pagination
-      const limit = options.limit || 50;
-      const page = options.page || 1;
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-
-      const paginatedPhotos = filteredPhotos.slice(startIndex, endIndex);
-
-      return {
+      return res.json({
         success: true,
-        photos: paginatedPhotos,
+        photos: filteredPhotos,
         total: filteredPhotos.length
-      };
+      });
     } catch (error: any) {
       console.error('Get photos by location error:', error);
-      return { success: false, error: error.message };
+      return res.status(500).json({ success: false, error: error.message });
     }
   }
 
-  static async searchPhotos(userId: string, filters: { 
-    query?: string; 
-    year?: number; 
-    location?: string; 
-    tags?: string; 
-    startDate?: string; 
-    endDate?: string;
-  }): Promise<{ success: boolean; photos?: Photo[]; total?: number; error?: string }> {
-    try {
-      // Get all user photos first (for simplicity, in production you'd use proper Firestore queries)
-      const result = await this.getUserPhotos(userId, { limit: 1000 });
-      
-      if (!result.success || !result.photos) {
-        return result;
+  static async searchPhotos(req: AuthenticatedRequest, res: Response) {
+     try {
+      const user = req.user;
+      const filters = req.query;
+
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized.' });
       }
 
-      let filteredPhotos = result.photos;
+      const allPhotosResult = await this.getAllUserPhotos(user.uid);
+      if (!allPhotosResult.success || !allPhotosResult.photos) {
+        return res.status(500).json(allPhotosResult);
+      }
+
+      let filteredPhotos = allPhotosResult.photos;
 
       // Apply search query filter
       if (filters.query) {
-        const query = filters.query.toLowerCase();
+        const query = (filters.query as string).toLowerCase();
         filteredPhotos = filteredPhotos.filter(photo => 
           photo.fileName.toLowerCase().includes(query) ||
           photo.title?.toLowerCase().includes(query) ||
@@ -278,23 +313,25 @@ export class PhotoService {
 
       // Apply year filter
       if (filters.year) {
+        const year = parseInt(filters.year as string);
         filteredPhotos = filteredPhotos.filter(photo => {
           const photoYear = new Date(photo.metadata.timestamp).getFullYear();
-          return photoYear === filters.year;
+          return photoYear === year;
         });
       }
 
       // Apply location filter
       if (filters.location) {
+        const location = (filters.location as string).toLowerCase();
         filteredPhotos = filteredPhotos.filter(photo => 
-          photo.metadata.locationName?.toLowerCase().includes(filters.location!.toLowerCase())
+          photo.metadata.locationName?.toLowerCase().includes(location)
         );
       }
 
       // Apply date range filter
       if (filters.startDate || filters.endDate) {
-        const startDate = filters.startDate ? new Date(filters.startDate) : new Date(0);
-        const endDate = filters.endDate ? new Date(filters.endDate) : new Date();
+        const startDate = filters.startDate ? new Date(filters.startDate as string) : new Date(0);
+        const endDate = filters.endDate ? new Date(filters.endDate as string) : new Date();
         
         filteredPhotos = filteredPhotos.filter(photo => {
           const photoDate = new Date(photo.metadata.timestamp);
@@ -302,28 +339,35 @@ export class PhotoService {
         });
       }
 
-      return {
+      return res.json({
         success: true,
         photos: filteredPhotos,
         total: filteredPhotos.length
-      };
+      });
+
     } catch (error: any) {
       console.error('Search photos error:', error);
-      return { success: false, error: error.message };
+      return res.status(500).json({ success: false, error: error.message });
     }
   }
 
-  static async getTimeline(userId: string, groupBy: string = 'month'): Promise<{ success: boolean; timeline?: any; error?: string }> {
+  static async getTimeline(req: AuthenticatedRequest, res: Response) {
     try {
-      const result = await this.getUserPhotos(userId, { limit: 1000 });
+      const user = req.user;
+      const { groupBy } = req.query;
+
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized.' });
+      }
       
-      if (!result.success || !result.photos) {
-        return { success: false, error: result.error };
+      const allPhotosResult = await this.getAllUserPhotos(user.uid);
+      if (!allPhotosResult.success || !allPhotosResult.photos) {
+        return res.status(500).json(allPhotosResult);
       }
 
       const timeline: { [key: string]: Photo[] } = {};
       
-      result.photos.forEach(photo => {
+      allPhotosResult.photos.forEach(photo => {
         const date = new Date(photo.metadata.timestamp);
         let groupKey: string;
 
@@ -347,54 +391,71 @@ export class PhotoService {
         timeline[groupKey].push(photo);
       });
 
-      return { success: true, timeline };
+      return res.json({ success: true, timeline });
     } catch (error: any) {
       console.error('Get timeline error:', error);
-      return { success: false, error: error.message };
+      return res.status(500).json({ success: false, error: error.message });
     }
   }
 
-  static async getTimelineByMonth(userId: string, year: number, month: number): Promise<{ success: boolean; photos?: Photo[]; total?: number; error?: string }> {
+  static async getTimelineByMonth(req: AuthenticatedRequest, res: Response) {
     try {
-      const result = await this.getUserPhotos(userId, { limit: 1000 });
-      
-      if (!result.success || !result.photos) {
-        return { success: false, error: result.error };
+      const user = req.user;
+      const { year, month } = req.query;
+
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized.' });
+      }
+      if (!year || !month) {
+        return res.status(400).json({ success: false, error: 'Year and month query parameters are required.' });
       }
 
-      const monthPhotos = result.photos.filter(photo => {
+      const yearNum = parseInt(year as string);
+      const monthNum = parseInt(month as string);
+
+      const allPhotosResult = await this.getAllUserPhotos(user.uid);
+      if (!allPhotosResult.success || !allPhotosResult.photos) {
+        return res.status(500).json(allPhotosResult);
+      }
+
+      const monthPhotos = allPhotosResult.photos.filter(photo => {
         const date = new Date(photo.metadata.timestamp);
-        return date.getFullYear() === year && date.getMonth() + 1 === month;
+        return date.getFullYear() === yearNum && date.getMonth() + 1 === monthNum;
       });
 
-      return { 
+      return res.json({ 
         success: true, 
         photos: monthPhotos,
         total: monthPhotos.length
-      };
+      });
     } catch (error: any) {
       console.error('Get timeline by month error:', error);
-      return { success: false, error: error.message };
+      return res.status(500).json({ success: false, error: error.message });
     }
   }
 
-  static async getPhotoStats(userId: string): Promise<{ success: boolean; stats?: any; error?: string }> {
+  static async getPhotoStats(req: AuthenticatedRequest, res: Response) {
     try {
-      const result = await this.getUserPhotos(userId, { limit: 1000 });
-      
-      if (!result.success || !result.photos) {
-        return { success: false, error: result.error };
+      const user = req.user;
+
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized.' });
+      }
+
+      const allPhotosResult = await this.getAllUserPhotos(user.uid);
+      if (!allPhotosResult.success || !allPhotosResult.photos) {
+        return res.status(500).json(allPhotosResult);
       }
 
       const stats = {
-        totalPhotos: result.photos.length,
+        totalPhotos: allPhotosResult.photos.length,
         byYear: {} as { [key: number]: number },
         byLocation: {} as { [key: string]: number },
         byCamera: {} as { [key: string]: number },
         byMonth: {} as { [key: string]: number }
       };
 
-      result.photos.forEach(photo => {
+      allPhotosResult.photos.forEach(photo => {
         const date = new Date(photo.metadata.timestamp);
         const year = date.getFullYear();
         const month = `${year}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
@@ -407,25 +468,96 @@ export class PhotoService {
         stats.byCamera[camera] = (stats.byCamera[camera] || 0) + 1;
       });
 
-      return { success: true, stats };
+      return res.json({ success: true, stats });
     } catch (error: any) {
       console.error('Get photo stats error:', error);
-      return { success: false, error: error.message };
+      return res.status(500).json({ success: false, error: error.message });
     }
   }
 
-  static async getPhotosByYear(userId: string, year: number, options: { limit?: number; page?: number } = {}): Promise<{ success: boolean; photos?: Photo[]; total?: number; error?: string }> {
+  static async getPhotosByYear(req: AuthenticatedRequest, res: Response) {
     try {
-      const result = await this.getUserPhotos(userId, {
-        year,
-        limit: options.limit,
-        page: options.page
+      const user = req.user;
+      const { year } = req.query;
+
+      if (!user) {
+        return res.status(401).json({ success: false, error: 'Unauthorized.' });
+      }
+      if (!year) {
+        return res.status(400).json({ success: false, error: 'Year query parameter is required.' });
+      }
+
+      const yearNum = parseInt(year as string);
+
+      // We need the internal logic for getUserPhotos here, not the route handler itself
+      // Reusing the private helper
+      const allPhotosResult = await this.getAllUserPhotos(user.uid);
+      if (!allPhotosResult.success || !allPhotosResult.photos) {
+          return res.status(500).json(allPhotosResult);
+      }
+
+      const yearPhotos = allPhotosResult.photos.filter(photo => {
+          const date = new Date(photo.metadata.timestamp);
+          return date.getFullYear() === yearNum;
+      });
+      
+      // Basic pagination (can be improved)
+      const limit = parseInt(req.query.limit as string) || 50;
+      const page = parseInt(req.query.page as string) || 1;
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedPhotos = yearPhotos.slice(startIndex, endIndex);
+
+      return res.json({ 
+          success: true, 
+          photos: paginatedPhotos,
+          total: yearPhotos.length 
       });
 
-      return result;
     } catch (error: any) {
       console.error('Get photos by year error:', error);
-      return { success: false, error: error.message };
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  // --- ADDED: Stubbed methods to fix compile errors ---
+
+  static async uploadMultiplePhotos(req: AuthenticatedRequest, res: Response) {
+    return res.status(501).json({ success: false, error: 'Not implemented: uploadMultiplePhotos' });
+  }
+
+  static async autoGroupPhotos(req: AuthenticatedRequest, res: Response) {
+    return res.status(501).json({ success: false, error: 'Not implemented: autoGroupPhotos' });
+  }
+
+  static async getUserTrips(req: AuthenticatedRequest, res: Response) {
+    return res.status(501).json({ success: false, error: 'Not implemented: getUserTrips' });
+  }
+
+  static async createTrip(req: AuthenticatedRequest, res: Response) {
+    return res.status(501).json({ success: false, error: 'Not implemented: createTrip' });
+  }
+
+  static async getMapPins(req: AuthenticatedRequest, res: Response) {
+    return res.status(501).json({ success: false, error: 'Not implemented: getMapPins' });
+  }
+
+  // --- ADDED: Private helper to get all photos for internal filtering ---
+  private static async getAllUserPhotos(userId: string): Promise<{ success: boolean; photos?: Photo[]; error?: string }> {
+    try {
+      const photosRef = db.collection('photos').where('userId', '==', userId);
+      const snapshot = await photosRef.orderBy('metadata.timestamp', 'desc').get();
+
+      const photos: Photo[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Photo));
+
+      return { success: true, photos };
+    } catch (error: any) {
+      console.error('Get all user photos helper error:', error);
+      return { success: false, error: 'Internal server error' };
     }
   }
 }
+
