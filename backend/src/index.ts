@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Import routes
-import { photoRoutes } from './routes/photoRoutes';
+import photoRoutes from './routes/photoRoutes';
 import { tripRoutes } from './routes/tripRoutes';
 import { authRoutes } from './routes/authRoutes';
 

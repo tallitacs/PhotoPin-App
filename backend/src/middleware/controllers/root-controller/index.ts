@@ -1,4 +1,4 @@
-import { Controller, HttpServer } from "../controllers/index"; // Correct path
+import { Controller, HttpServer } from "../";
 import { RequestHandler } from "express";
 
 let counter:number = 1;

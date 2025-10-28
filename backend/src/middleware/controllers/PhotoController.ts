@@ -1,67 +1,125 @@
-import { Response } from 'express';
-import { AuthenticatedRequest } from '../authMiddleware';
-import { photoService } from '../../services/PhotoService';
-import { PhotoQueryFilters, Photo } from '../../@types/Photo';
-import { Controller, HttpServer } from './index'; // Import from correct location
+import { Request, Response } from 'express';
+import { PhotoService } from '../../services/PhotoService';
 
-export class PhotoController implements Controller {
-  
-    initialize(httpServer: HttpServer): void {
-        // You can register PhotoController routes with HttpServer here
-        // Example:
-        // httpServer.post('/photos/upload', this.uploadPhoto.bind(this));
-        // httpServer.get('/photos', this.getPhotos.bind(this));
-        // etc.
-        
-        console.log('PhotoController initialized with HttpServer');
+export class PhotoController {
+
+  // --- Core Photo Methods ---
+
+  public static async uploadPhoto(req: Request, res: Response) {
+    try {
+      const { user } = (req as any);
+      const { title, description, tags, albumIds } = req.body;
+
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: 'No file uploaded' });
+      }
+
+      const result = await PhotoService.uploadPhoto(req.file, user.uid, {
+        title, description, tags, albumIds
+      });
+
+      if (result.success) {
+        return res.status(201).json(result);
+      } else {
+        return res.status(500).json(result);
+      }
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      return res.status(500).json({ success: false, error: error.message });
     }
+  }
 
-    // ... ALL YOUR EXISTING INSTANCE METHODS ...
-    uploadPhoto = async (req: AuthenticatedRequest, res: Response) => {
-        // ... your implementation
-    };
+  public static async getPhotos(req: Request, res: Response) {
+    try {
+      const { user } = (req as any);
+      const { limit, page, year } = req.query;
 
-    uploadMultiplePhotos = async (req: AuthenticatedRequest, res: Response) => {
-        // ... your implementation
-    };
+      const result = await PhotoService.getUserPhotos(user.uid, {
+        limit: limit ? parseInt(limit as string) : 50,
+        page: page ? parseInt(page as string) : 1,
+        year: year ? parseInt(year as string) : undefined
+      });
 
-    getPhotos = async (req: AuthenticatedRequest, res: Response) => {
-        // ... your implementation
-    };
+      return res.status(result.success ? 200 : 500).json(result);
+    } catch (error: any) {
+      console.error('Get photos error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
 
-    getPhoto = async (req: AuthenticatedRequest, res: Response) => {
-        // ... your implementation
-    };
+  public static async getPhoto(req: Request, res: Response) {
+    try {
+      const { user } = (req as any);
+      const { photoId } = req.params;
 
-    updatePhoto = async (req: AuthenticatedRequest, res: Response) => {
-        // ... your implementation
-    };
+      const result = await PhotoService.getPhoto(user.uid, photoId);
 
-    deletePhoto = async (req: AuthenticatedRequest, res: Response) => {
-        // ... your implementation
-    };
+      return res.status(result.success ? 200 : 404).json(result);
+    } catch (error: any) {
+      console.error('Get photo error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
 
-    autoGroupPhotos = async (req: AuthenticatedRequest, res: Response) => {
-        // ... your implementation
-    };
+  public static async deletePhoto(req: Request, res: Response) {
+    try {
+      const { user } = (req as any);
+      const { photoId } = req.params;
 
-    getUserTrips = async (req: AuthenticatedRequest, res: Response) => {
-        // ... your implementation
-    };
+      const result = await PhotoService.deletePhoto(user.uid, photoId);
 
-    createTrip = async (req: AuthenticatedRequest, res: Response) => {
-        // ... your implementation
-    };
+      return res.status(result.success ? 200 : 404).json(result);
+    } catch (error: any) {
+      console.error('Delete photo error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
 
-    getMapPins = async (req: AuthenticatedRequest, res: Response) => {
-        // ... your implementation
-    };
+  public static async updatePhoto(req: Request, res: Response) {
+    try {
+      const { user } = (req as any);
+      const { photoId } = req.params;
 
-    getTimeline = async (req: AuthenticatedRequest, res: Response) => {
-        // ... your implementation
-    };
+      // Note: Your router calls this 'updatePhoto', but your service
+      // calls it 'updatePhotoMetadata'. We're calling the service method here.
+      const result = await PhotoService.updatePhotoMetadata(user.uid, photoId, req.body);
 
-    searchPhotos = async (req: AuthenticatedRequest, res: Response) => {
-        // ... your implementation
-    };
+      return res.status(result.success ? 200 : 404).json(result);
+    } catch (error: any) {
+      console.error('Update photo error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  // --- STUB METHODS (To fix compilation) ---
+  // These methods are in your router but not in your service yet.
+  // This will make your app compile, but they will return a "Not implemented" error if you call them.
+
+  public static async uploadMultiplePhotos(req: Request, res: Response) {
+    res.status(501).json({ success: false, error: 'Not implemented' });
+  }
+
+  public static async autoGroupPhotos(req: Request, res: Response) {
+    res.status(501).json({ success: false, error: 'Not implemented' });
+  }
+
+  public static async getUserTrips(req: Request, res: Response) {
+    res.status(501).json({ success: false, error: 'Not implemented' });
+  }
+
+  public static async createTrip(req: Request, res: Response) {
+    res.status(501).json({ success: false, error: 'Not implemented' });
+  }
+
+  public static async getMapPins(req: Request, res: Response) {
+    res.status(501).json({ success: false, error: 'Not implemented' });
+  }
+
+  public static async getTimeline(req: Request, res: Response) {
+    res.status(501).json({ success: false, error: 'Not implemented' });
+  }
+
+  public static async searchPhotos(req: Request, res: Response) {
+  res.status(501).json({ success: false, error: 'Not implemented' }); 
+}
 }

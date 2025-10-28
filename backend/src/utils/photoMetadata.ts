@@ -19,8 +19,11 @@ export class PhotoMetadataUtil {
       
       if (exifData) {
         // Extract dimensions
-        if (exifImageWidth && exifImageHeight) {
+        // To:
+        if (exifData.ImageWidth || exifData.ExifImageWidth) {
           metadata.width = exifData.ImageWidth || exifData.ExifImageWidth;
+        }
+        if (exifData.ImageHeight || exifData.ExifImageHeight) {
           metadata.height = exifData.ImageHeight || exifData.ExifImageHeight;
         }
 
@@ -29,7 +32,7 @@ export class PhotoMetadataUtil {
           metadata.gps = {
             latitude: exifData.latitude,
             longitude: exifData.longitude,
-            altitude: exifData.altitude
+            altitude: typeof exifData.altitude === 'string' ? parseFloat(exifData.altitude) : exifData.altitude
           };
         }
 
