@@ -1,125 +1,155 @@
 import { Request, Response } from 'express';
-import { PhotoService } from '../../services/PhotoService';
+// ✅ FIX 1: Import the INSTANCE 'photoService' (lowercase 'p')
+import { photoService } from '../../services/PhotoService';
 
 export class PhotoController {
-
-  // --- Core Photo Methods ---
-
-  public static async uploadPhoto(req: Request, res: Response) {
+  
+  static async uploadPhoto(req: Request, res: Response) {
     try {
-      const { user } = (req as any);
-      const { title, description, tags, albumIds } = req.body;
+      const { user } = (req as any); // From your auth middleware
 
       if (!req.file) {
-        return res.status(400).json({ success: false, error: 'No file uploaded' });
+        return res.status(400).json({ 
+          success: false, 
+          error: 'No file uploaded' 
+        });
       }
 
-      const result = await PhotoService.uploadPhoto(req.file, user.uid, {
-        title, description, tags, albumIds
+      // ✅ FIX 2: Call the method on the INSTANCE
+      // ✅ FIX 3: Pass arguments in the correct order (userId, file)
+      const { photo, error } = await photoService.uploadPhoto(user.uid, req.file);
+
+      if (error) {
+        return res.status(500).json({ success: false, error });
+      }
+      
+      res.status(201).json({
+        success: true,
+        message: 'Photo uploaded successfully',
+        photo
       });
 
-      if (result.success) {
-        return res.status(201).json(result);
-      } else {
-        return res.status(500).json(result);
-      }
     } catch (error: any) {
-      console.error('Upload error:', error);
-      return res.status(500).json({ success: false, error: error.message });
+      console.error('Photo upload error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
     }
   }
 
-  public static async getPhotos(req: Request, res: Response) {
+  static async getPhotos(req: Request, res: Response) {
     try {
       const { user } = (req as any);
-      const { limit, page, year } = req.query;
+      const { limit, page, year, tripId, hasLocation, tags } = req.query;
 
-      const result = await PhotoService.getUserPhotos(user.uid, {
+      // Prepare filters
+      const filters = {
         limit: limit ? parseInt(limit as string) : 50,
-        page: page ? parseInt(page as string) : 1,
-        year: year ? parseInt(year as string) : undefined
+        offset: page ? (parseInt(page as string) - 1) * (parseInt(limit as string) || 50) : 0,
+        year: year ? parseInt(year as string) : undefined,
+        tripId: tripId as string,
+        hasLocation: hasLocation === 'true',
+        tags: tags ? (tags as string).split(',') : undefined
+      };
+
+      // ✅ FIX: Call the method on the INSTANCE
+      const { photos, total, error } = await photoService.getUserPhotos(user.uid, filters);
+
+      if (error) {
+        return res.status(500).json({ success: false, error });
+      }
+
+      res.json({
+        success: true,
+        photos,
+        total
       });
 
-      return res.status(result.success ? 200 : 500).json(result);
     } catch (error: any) {
       console.error('Get photos error:', error);
-      return res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
     }
   }
 
-  public static async getPhoto(req: Request, res: Response) {
+  static async getPhoto(req: Request, res: Response) {
     try {
       const { user } = (req as any);
       const { photoId } = req.params;
 
-      const result = await PhotoService.getPhoto(user.uid, photoId);
+      // ✅ FIX 2: Call the method on the INSTANCE
+      // ✅ FIX 3: Use the correct method name 'getPhotoById'
+      // ✅ FIX 3: Pass arguments in the correct order (photoId, userId)
+      const { photo, error } = await photoService.getPhotoById(photoId, user.uid);
 
-      return res.status(result.success ? 200 : 404).json(result);
+      if (error) {
+        return res.status(404).json({ success: false, error });
+      }
+
+      res.json({
+        success: true,
+        photo
+      });
+
     } catch (error: any) {
       console.error('Get photo error:', error);
-      return res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
     }
   }
 
-  public static async deletePhoto(req: Request, res: Response) {
+  static async deletePhoto(req: Request, res: Response) {
     try {
       const { user } = (req as any);
       const { photoId } = req.params;
 
-      const result = await PhotoService.deletePhoto(user.uid, photoId);
+      // ✅ FIX 2: Call the method on the INSTANCE
+      // ✅ FIX 3: Pass arguments in the correct order (photoId, userId)
+      const { success, error } = await photoService.deletePhoto(photoId, user.uid);
 
-      return res.status(result.success ? 200 : 404).json(result);
+      if (error) {
+        return res.status(400).json({ success: false, error });
+      }
+
+      res.json({ success: true, message: 'Photo deleted' });
+
     } catch (error: any) {
       console.error('Delete photo error:', error);
-      return res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
     }
   }
 
-  public static async updatePhoto(req: Request, res: Response) {
+  static async updatePhotoMetadata(req: Request, res: Response) {
     try {
       const { user } = (req as any);
       const { photoId } = req.params;
+      const updates = req.body;
 
-      // Note: Your router calls this 'updatePhoto', but your service
-      // calls it 'updatePhotoMetadata'. We're calling the service method here.
-      const result = await PhotoService.updatePhotoMetadata(user.uid, photoId, req.body);
+      // ✅ FIX 2: Call the method on the INSTANCE
+      // ✅ FIX 3: Use the correct method name 'updatePhoto'
+      // ✅ FIX 3: Pass arguments in the correct order (photoId, userId, updates)
+      const { photo, error } = await photoService.updatePhoto(photoId, user.uid, updates);
 
-      return res.status(result.success ? 200 : 404).json(result);
+      if (error) {
+        return res.status(400).json({ success: false, error });
+      }
+
+      res.json({ success: true, photo });
+
     } catch (error: any) {
       console.error('Update photo error:', error);
-      return res.status(500).json({ success: false, error: error.message });
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
     }
   }
-
-  // --- STUB METHODS (To fix compilation) ---
-  // These methods are in your router but not in your service yet.
-  // This will make your app compile, but they will return a "Not implemented" error if you call them.
-
-  public static async uploadMultiplePhotos(req: Request, res: Response) {
-    res.status(501).json({ success: false, error: 'Not implemented' });
-  }
-
-  public static async autoGroupPhotos(req: Request, res: Response) {
-    res.status(501).json({ success: false, error: 'Not implemented' });
-  }
-
-  public static async getUserTrips(req: Request, res: Response) {
-    res.status(501).json({ success: false, error: 'Not implemented' });
-  }
-
-  public static async createTrip(req: Request, res: Response) {
-    res.status(501).json({ success: false, error: 'Not implemented' });
-  }
-
-  public static async getMapPins(req: Request, res: Response) {
-    res.status(501).json({ success: false, error: 'Not implemented' });
-  }
-
-  public static async getTimeline(req: Request, res: Response) {
-    res.status(501).json({ success: false, error: 'Not implemented' });
-  }
-
-  public static async searchPhotos(req: Request, res: Response) {
-  res.status(501).json({ success: false, error: 'Not implemented' }); 
-}
 }
