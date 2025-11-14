@@ -1,6 +1,7 @@
-import { Request, Response } from 'express';
+import { Response, Express } from 'express';
 import { photoService } from '../services/PhotoService';
-import { AuthenticatedRequest } from '../middleware/authMiddleware';
+// Import from the correct @types directory
+import { AuthenticatedRequest } from '../@types/express';
 
 // Helper function to get authenticated user
 function getAuthenticatedUser(req: AuthenticatedRequest) {
@@ -11,20 +12,22 @@ function getAuthenticatedUser(req: AuthenticatedRequest) {
 }
 
 export class PhotoController {
-  static async uploadPhoto(req: AuthenticatedRequest, res: Response) {
+  static async uploadPhoto(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const user = getAuthenticatedUser(req);
       if (!user || !req.file) {
-        return res.status(400).json({ 
+        res.status(400).json({ 
           success: false, 
           error: 'User authentication or file missing' 
         });
+        return;
       }
 
       const result = await photoService.uploadPhoto(user.uid, req.file);
 
       if (result.error) {
-        return res.status(500).json({ success: false, error: result.error });
+        res.status(500).json({ success: false, error: result.error });
+        return;
       }
       
       res.status(201).json({
@@ -32,45 +35,53 @@ export class PhotoController {
         message: 'Photo uploaded successfully',
         photo: result.photo
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 
-  static async uploadMultiplePhotos(req: AuthenticatedRequest, res: Response) {
+  static async uploadMultiplePhotos(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const user = getAuthenticatedUser(req);
       if (!user || !req.files || !Array.isArray(req.files)) {
-        return res.status(400).json({ 
+        res.status(400).json({ 
           success: false, 
           error: 'User authentication or files missing' 
         });
+        return;
       }
 
-      const uploadPromises = req.files.map(file => 
+      // Explicitly type 'file' here to fix implicit any
+      const uploadPromises = (req.files as Express.Multer.File[]).map((file: Express.Multer.File) => 
         photoService.uploadPhoto(user.uid, file)
       );
       
       const results = await Promise.all(uploadPromises);
-      const successfulUploads = results.filter(result => result.photo);
-      const errors = results.filter(result => result.error);
+      
+      // Explicitly type 'result' here
+      type UploadResult = { photo?: any; error?: any };
+
+      const successfulUploads = results.filter((result: UploadResult) => result.photo);
+      const errors = results.filter((result: UploadResult) => result.error);
 
       res.status(201).json({
         success: true,
         message: `Successfully uploaded ${successfulUploads.length} photos`,
-        uploaded: successfulUploads.map(r => r.photo),
-        errors: errors.map(e => e.error)
+        // Explicitly type 'r' and 'e' here
+        uploaded: successfulUploads.map((r: { photo?: any }) => r.photo),
+        errors: errors.map((e: { error?: any }) => e.error)
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 
-  static async getPhotos(req: AuthenticatedRequest, res: Response) {
+  static async getPhotos(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const user = getAuthenticatedUser(req);
       if (!user) {
-        return res.status(401).json({ success: false, error: 'Unauthorized' });
+        res.status(401).json({ success: false, error: 'Unauthorized' });
+        return;
       }
 
       const { limit, page, year, month, tripId, hasLocation, tags } = req.query;
@@ -88,7 +99,8 @@ export class PhotoController {
       const result = await photoService.getUserPhotos(user.uid, filters);
 
       if (result.error) {
-        return res.status(500).json({ success: false, error: result.error });
+        res.status(500).json({ success: false, error: result.error });
+        return;
       }
 
       res.json({
@@ -97,46 +109,50 @@ export class PhotoController {
         total: result.total,
         page: page ? parseInt(page as string) : 1
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 
-  static async getPhoto(req: AuthenticatedRequest, res: Response) {
+  static async getPhoto(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const user = getAuthenticatedUser(req);
       if (!user) {
-        return res.status(401).json({ success: false, error: 'Unauthorized' });
+        res.status(401).json({ success: false, error: 'Unauthorized' });
+        return;
       }
 
       const { photoId } = req.params;
       const result = await photoService.getPhotoById(photoId, user.uid);
 
       if (result.error) {
-        return res.status(404).json({ success: false, error: result.error });
+        res.status(404).json({ success: false, error: result.error });
+        return;
       }
 
       res.json({
         success: true,
         photo: result.photo
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 
-  static async updatePhoto(req: AuthenticatedRequest, res: Response) {
+  static async updatePhoto(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const user = getAuthenticatedUser(req);
       if (!user) {
-        return res.status(401).json({ success: false, error: 'Unauthorized' });
+        res.status(401).json({ success: false, error: 'Unauthorized' });
+        return;
       }
 
       const { photoId } = req.params;
       const result = await photoService.updatePhoto(photoId, user.uid, req.body);
 
       if (result.error) {
-        return res.status(400).json({ success: false, error: result.error });
+        res.status(400).json({ success: false, error: result.error });
+        return;
       }
 
       res.json({
@@ -144,39 +160,42 @@ export class PhotoController {
         message: 'Photo updated successfully',
         photo: result.photo
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 
-  static async deletePhoto(req: AuthenticatedRequest, res: Response) {
+  static async deletePhoto(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const user = getAuthenticatedUser(req);
       if (!user) {
-        return res.status(401).json({ success: false, error: 'Unauthorized' });
+        res.status(401).json({ success: false, error: 'Unauthorized' });
+        return;
       }
 
       const { photoId } = req.params;
       const result = await photoService.deletePhoto(photoId, user.uid);
 
       if (!result.success) {
-        return res.status(400).json({ success: false, error: result.error });
+        res.status(400).json({ success: false, error: result.error });
+        return;
       }
 
       res.json({
         success: true,
         message: 'Photo deleted successfully'
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 
-  static async getTimeline(req: AuthenticatedRequest, res: Response) {
+  static async getTimeline(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const user = getAuthenticatedUser(req);
       if (!user) {
-        return res.status(401).json({ success: false, error: 'Unauthorized' });
+        res.status(401).json({ success: false, error: 'Unauthorized' });
+        return;
       }
 
       const { year, month } = req.query;
@@ -188,7 +207,8 @@ export class PhotoController {
       const result = await photoService.getPhotoTimeline(user.uid, filters);
 
       if (result.error) {
-        return res.status(500).json({ success: false, error: result.error });
+        res.status(500).json({ success: false, error: result.error });
+        return;
       }
 
       res.json({
@@ -196,22 +216,24 @@ export class PhotoController {
         timeline: result.timeline,
         total: result.total
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 
-  static async getMapPins(req: AuthenticatedRequest, res: Response) {
+  static async getMapPins(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const user = getAuthenticatedUser(req);
       if (!user) {
-        return res.status(401).json({ success: false, error: 'Unauthorized' });
+        res.status(401).json({ success: false, error: 'Unauthorized' });
+        return;
       }
 
       const result = await photoService.getPhotosWithLocation(user.uid);
 
       if (result.error) {
-        return res.status(500).json({ success: false, error: result.error });
+        res.status(500).json({ success: false, error: result.error });
+        return;
       }
 
       res.json({
@@ -219,28 +241,31 @@ export class PhotoController {
         photos: result.photos,
         total: result.total
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 
-  static async searchPhotos(req: AuthenticatedRequest, res: Response) {
+  static async searchPhotos(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const user = getAuthenticatedUser(req);
       if (!user) {
-        return res.status(401).json({ success: false, error: 'Unauthorized' });
+        res.status(401).json({ success: false, error: 'Unauthorized' });
+        return;
       }
 
       const { q } = req.query;
       
       if (!q) {
-        return res.status(400).json({ success: false, error: 'Search query required' });
+        res.status(400).json({ success: false, error: 'Search query required' });
+        return;
       }
 
       const result = await photoService.searchPhotos(user.uid, q as string);
 
       if (result.error) {
-        return res.status(500).json({ success: false, error: result.error });
+        res.status(500).json({ success: false, error: result.error });
+        return;
       }
 
       res.json({
@@ -248,8 +273,8 @@ export class PhotoController {
         photos: result.photos,
         total: result.total
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 }

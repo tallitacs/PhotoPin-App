@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { tripService } from '../services/TripService';
-import { AuthenticatedRequest } from '../middleware/authMiddleware';
+// Import from the correct @types directory
+import { AuthenticatedRequest } from '../@types/express';
 
 export class TripController {
   static async createTrip(req: AuthenticatedRequest, res: Response) {
@@ -35,8 +36,8 @@ export class TripController {
         message: 'Trip created successfully',
         trip: result.trip
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 
@@ -56,8 +57,8 @@ export class TripController {
         success: true,
         trips: result.trips
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 
@@ -78,8 +79,8 @@ export class TripController {
         success: true,
         trip: result.trip
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 
@@ -101,8 +102,8 @@ export class TripController {
         message: 'Trip updated successfully',
         trip: result.trip
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 
@@ -123,8 +124,8 @@ export class TripController {
         success: true,
         message: 'Trip deleted successfully'
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 
@@ -155,8 +156,8 @@ export class TripController {
         message: 'Photos added to trip successfully',
         trip: result.trip
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 
@@ -183,8 +184,8 @@ export class TripController {
         message: `Created ${result.trips?.length || 0} trips`,
         trips: result.trips
       });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ success: false, error: (error instanceof Error) ? error.message : 'Unknown error' });
     }
   }
 }

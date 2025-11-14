@@ -1,6 +1,8 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Request, Response } from 'express';
 import { PhotoController } from '../controllers/PhotoController';
-import { authenticateToken, AuthenticatedRequest } from '../middleware/authMiddleware';
+import { authenticateToken } from '../middleware/authMiddleware';
+// Import the correct type
+import { AuthenticatedRequest } from '../@types/express';
 import { upload, handleUploadError } from '../middleware/upload';
 
 const router = Router();
@@ -13,6 +15,7 @@ router.post(
   '/upload',
   upload.single('photo'),
   handleUploadError,
+  // FIX: Use base Request and cast 'req' when passing to controller
   (req: Request, res: Response) => PhotoController.uploadPhoto(req as AuthenticatedRequest, res)
 );
 
@@ -20,10 +23,12 @@ router.post(
   '/upload-multiple',
   upload.array('photos', 10),
   handleUploadError,
+  // FIX: Use base Request and cast 'req' when passing to controller
   (req: Request, res: Response) => PhotoController.uploadMultiplePhotos(req as AuthenticatedRequest, res)
 );
 
 // Photo management
+// FIX: Use base Request and cast 'req' when passing to controller
 router.get('/', (req: Request, res: Response) => 
   PhotoController.getPhotos(req as AuthenticatedRequest, res)
 );

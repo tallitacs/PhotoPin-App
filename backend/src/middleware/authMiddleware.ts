@@ -1,18 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { auth } from '../config/firebaseAdmin';
+// FIX: This import path is corrected to point to your express.d.ts file
+import { AuthenticatedRequest } from '../@types/express';
 
-export interface AuthenticatedRequest extends Request {
-  user: {
-    uid: string;
-    email?: string;
-    displayName?: string;
-  };
-}
-
-/**
- * Authentication middleware to verify Firebase ID tokens
- */
 export const authenticateToken = (
+  // Use the base Request type here
   req: Request,
   res: Response,
   next: NextFunction
@@ -40,7 +32,8 @@ export const authenticateToken = (
   // Verify Firebase token
   auth.verifyIdToken(token)
     .then((decodedToken) => {
-      req.user = {
+      // Cast 'req' when assigning the user property
+      (req as AuthenticatedRequest).user = {
         uid: decodedToken.uid,
         email: decodedToken.email,
         displayName: decodedToken.name
@@ -56,10 +49,8 @@ export const authenticateToken = (
     });
 };
 
-/**
- * Optional authentication middleware
- */
 export const optionalAuthenticate = async (
+  // Use the base Request type here
   req: Request,
   res: Response,
   next: NextFunction
@@ -70,14 +61,15 @@ export const optionalAuthenticate = async (
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split('Bearer ')[1];
       const decodedToken = await auth.verifyIdToken(token);
-      req.user = {
+      // Cast 'req' when assigning
+      (req as AuthenticatedRequest).user = {
         uid: decodedToken.uid,
         email: decodedToken.email,
         displayName: decodedToken.name
       };
     } else {
-      // Set a default user object for optional routes
-      req.user = {
+      // Cast 'req' when assigning
+      (req as AuthenticatedRequest).user = {
         uid: 'anonymous',
         email: undefined,
         displayName: undefined
@@ -86,8 +78,8 @@ export const optionalAuthenticate = async (
 
     next();
   } catch (error) {
-    // Continue with anonymous user for optional routes
-    req.user = {
+    // Cast 'req' when assigning
+    (req as AuthenticatedRequest).user = {
       uid: 'anonymous',
       email: undefined,
       displayName: undefined
