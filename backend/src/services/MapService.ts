@@ -16,16 +16,16 @@ export class MapService {
    */
   generatePhotoMarkers(photos: Photo[]): any[] {
     return photos
-      .filter(photo => photo.location)
+      .filter(photo => photo.metadata.gps)
       .map(photo => ({
         id: photo.id,
         position: {
-          lat: photo.location!.latitude,
-          lng: photo.location!.longitude
+          lat: photo.metadata.gps!.latitude,
+          lng: photo.metadata.gps!.longitude
         },
         title: photo.fileName,
-        photoURL: photo.thumbnailURL || photo.downloadURL,
-        date: photo.metadata.takenAt || photo.createdAt
+        photoURL: photo.thumbnailUrl || photo.url,
+        date: photo.metadata.takenAt || photo.uploadedAt
       }));
   }
 
@@ -33,13 +33,18 @@ export class MapService {
    * Generate trip boundaries for map
    */
   generateTripBoundaries(trips: Trip[]): any[] {
-    return trips.map(trip => ({
-      id: trip.id,
-      name: trip.name,
-      bounds: trip.location.boundingBox,
-      center: trip.location.center,
-      photoCount: trip.photoIds.length
-    }));
+    return trips
+      .filter(trip => trip.location)
+      .map(trip => ({
+        id: trip.id,
+        name: trip.name,
+        bounds: trip.location!.boundingBox,
+        center: {
+          lat: trip.location!.centerLat,
+          lng: trip.location!.centerLng
+        },
+        photoCount: trip.photoIds.length
+      }));
   }
 
   /**

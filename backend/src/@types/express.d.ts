@@ -1,25 +1,21 @@
-import {DecodedIdToken, UserRecord} from "firebase-admin/lib/auth";
-import {MyClaims} from "../index";
-
+import { Request } from 'express';
 
 declare global {
-    namespace Express {
-        interface Request {
-            /** Indicates whether the user is authenticated on Firebase Authentication */
-            authenticated: boolean,
-
-            /** If authenticated: Contains user data of Firebase Authentication.  */
-            auth?:UserRecord,
-
-            /** If authenticated: Contains token data of Firebase Authentication. */
-            token?: DecodedIdToken,
-
-            /**
-             * Refers to the claims from the user that is performing the request,
-             * if the user is authenticated with Firebase, this object also includes the claims from `auth.claims` */
-            claims?: {
-                [MyClaims]: true | undefined,
-            }
-        }
+  namespace Express {
+    interface Request {
+      user?: {
+        uid: string;
+        email?: string;
+        displayName?: string;
+      };
     }
+  }
+}
+
+export interface AuthenticatedRequest extends Request {
+  user: {
+    uid: string;
+    email?: string;
+    displayName?: string;
+  };
 }

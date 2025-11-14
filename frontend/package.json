@@ -2,8 +2,14 @@
   "name": "photopin-frontend",
   "version": "1.0.0",
   "dependencies": {
+    "@googlemaps/js-api-loader": "^2.0.2",
+    "@types/react-router-dom": "^5.3.3",
+    "axios": "^1.13.2",
+    "date-fns": "^4.1.0",
+    "firebase": "^10.14.1",
+    "lucide-react": "^0.553.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "firebase": "^10.7.0"
+    "react-router-dom": "^7.9.6"
   }
 }

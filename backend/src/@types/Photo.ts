@@ -1,51 +1,67 @@
+export interface GPSCoordinates {
+  latitude: number;
+  longitude: number;
+  altitude?: number;
+}
+
 export interface PhotoMetadata {
   width: number;
   height: number;
   size: number;
   format: string;
-  takenAt?: string;
+  takenAt?: string; // ISO date string
+  gps?: GPSCoordinates;
   cameraMake?: string;
   cameraModel?: string;
-  gps?: {
-    latitude: number;
-    longitude: number;
-    altitude?: number;
-  };
+  iso?: number;
+  aperture?: string;
+  shutterSpeed?: string;
+  focalLength?: string;
 }
 
 export interface Photo {
   id: string;
   userId: string;
   fileName: string;
-  filePath: string;
-  downloadURL: string;
-  thumbnailURL?: string;
+  storagePath: string;
+  url: string;
+  thumbnailUrl?: string;
   metadata: PhotoMetadata;
-  location?: GeoPoint;
-  createdAt: string;
-  updatedAt: string;
-  tripId?: string;
   tags: string[];
-  isPublic: boolean;
+  tripId?: string;
+  uploadedAt: string;
+  updatedAt: string;
 }
 
-export interface GeoPoint {
-  latitude: number;
-  longitude: number;
-}
-
-export interface PhotoUploadResponse {
-  success: boolean;
+export interface PhotoUploadResult {
   photo?: Photo;
   error?: string;
 }
 
-export interface PhotoQueryFilters {
+export interface PhotosQueryResult {
+  photos?: Photo[];
+  total?: number;
+  error?: string;
+}
+
+export interface PhotoQueryResult {
+  photo?: Photo;
+  error?: string;
+}
+
+export interface PhotoDeleteResult {
+  success: boolean;
+  error?: string;
+}
+
+export interface PhotoFilters {
+  limit?: number;
+  offset?: number;
   year?: number;
   month?: number;
   tripId?: string;
   hasLocation?: boolean;
   tags?: string[];
-  limit?: number;
-  offset?: number;
+  startDate?: string;
+  endDate?: string;
 }

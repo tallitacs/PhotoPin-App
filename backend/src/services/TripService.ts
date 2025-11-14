@@ -1,328 +1,376 @@
 import { db } from '../config/firebaseAdmin';
-import { Trip, CreateTripRequest, AutoClusterConfig } from '../@types/Trip';
+import { Trip, TripInput, TripResult, TripsResult, ClusterOptions, TripLocation } from '../@types/Trip';
 import { Photo } from '../@types/Photo';
 import { PhotoMetadataUtil } from '../utils/photoMetadata';
+import { v4 as uuidv4 } from 'uuid';
 
 export class TripService {
-  private static instance: TripService;
-
-  public static getInstance(): TripService {
-    if (!TripService.instance) {
-      TripService.instance = new TripService();
-    }
-    return TripService.instance;
-  }
+  private tripsCollection = db.collection('trips');
+  private photosCollection = db.collection('photos');
 
   /**
    * Create a new trip
    */
-  async createTrip(
-    userId: string, 
-    tripData: CreateTripRequest
-  ): Promise<{ trip: Trip | null; error?: string }> {
+  async createTrip(userId: string, tripData: TripInput): Promise<TripResult> {
     try {
-      // Validate photo ownership
-      const photoValidation = await this.validatePhotoOwnership(userId, tripData.photoIds);
-      if (!photoValidation.valid) {
-        return { trip: null, error: photoValidation.error };
+      const tripId = uuidv4();
+      
+      // Validate and fetch photos
+      const photoRefs = await Promise.all(
+        tripData.photoIds.map(id => this.photosCollection.doc(id).get())
+      );
+      
+      const validPhotos = photoRefs
+        .filter(ref => ref.exists && ref.data()?.userId === userId)
+        .map(ref => ref.data() as Photo);
+
+      if (validPhotos.length === 0) {
+        return { error: 'No valid photos found for this trip' };
       }
 
-      // Calculate trip bounds from photos
-      const tripBounds = await this.calculateTripBounds(tripData.photoIds);
+      // Calculate trip location from photo GPS data
+      const photosWithLocation = validPhotos.filter(p => p.metadata.gps);
+      let location: TripLocation | undefined;
       
-      const trip: Omit<Trip, 'id'> = {
+      if (photosWithLocation.length > 0) {
+        location = this.calculateTripLocation(photosWithLocation);
+      }
+
+      // Get cover photo (first photo or specified)
+      const coverPhoto = validPhotos[0];
+      
+      const trip: Trip = {
+        id: tripId,
         userId,
         name: tripData.name,
         description: tripData.description,
+        photoIds: validPhotos.map(p => p.id),
         startDate: tripData.startDate,
         endDate: tripData.endDate,
-        location: tripBounds,
-        photoIds: tripData.photoIds,
-        coverPhotoId: tripData.photoIds[0],
+        coverPhotoUrl: coverPhoto.thumbnailUrl || coverPhoto.url,
+        location,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        tags: this.generateTripTags(tripData.name, tripBounds)
+        updatedAt: new Date().toISOString()
       };
 
-      const docRef = await db.collection('trips').add(trip);
+      // Save trip
+      await this.tripsCollection.doc(tripId).set(trip);
 
-      // Update photos with trip ID
-      await this.updatePhotosWithTripId(tripData.photoIds, docRef.id);
-
-      return {
-        trip: {
-          id: docRef.id,
-          ...trip
-        }
-      };
-    } catch (error: any) {
-      console.error('Error creating trip:', error);
-      return { trip: null, error: 'Failed to create trip' };
-    }
-  }
-
-  /**
-   * Auto-cluster photos into trips
-   */
-  async autoClusterPhotos(
-    userId: string, 
-    config: AutoClusterConfig = {
-      maxDistance: 50, // km
-      maxTimeGap: 24, // hours
-      minPhotos: 3
-    }
-  ): Promise<{ trips: Trip[]; error?: string }> {
-    try {
-      // Get all user photos with location and date
-      const photosSnapshot = await db.collection('photos')
-        .where('userId', '==', userId)
-        .where('location', '!=', null)
-        .where('metadata.takenAt', '!=', null)
-        .orderBy('metadata.takenAt', 'asc')
-        .get();
-
-      const photos: Photo[] = [];
-      photosSnapshot.forEach(doc => {
-        photos.push({ id: doc.id, ...doc.data() } as Photo);
+      // Update photos with tripId
+      const batch = db.batch();
+      validPhotos.forEach(photo => {
+        const photoRef = this.photosCollection.doc(photo.id);
+        batch.update(photoRef, {
+          tripId,
+          updatedAt: new Date().toISOString()
+        });
       });
+      await batch.commit();
 
-      const clusters = this.clusterPhotos(photos, config);
-      const createdTrips: Trip[] = [];
-
-      // Create trips from clusters
-      for (const cluster of clusters) {
-        if (cluster.length >= config.minPhotos) {
-          const tripResult = await this.createTripFromCluster(userId, cluster);
-          if (tripResult.trip) {
-            createdTrips.push(tripResult.trip);
-          }
-        }
-      }
-
-      return { trips: createdTrips };
+      return { trip };
     } catch (error: any) {
-      console.error('Error auto-clustering photos:', error);
-      return { trips: [], error: 'Failed to auto-cluster photos' };
+      console.error('Create trip error:', error);
+      return { error: error.message || 'Failed to create trip' };
     }
   }
 
   /**
-   * Cluster photos based on time and location
+   * Get all trips for a user
    */
-  private clusterPhotos(photos: Photo[], config: AutoClusterConfig): Photo[][] {
-    const clusters: Photo[][] = [];
-    let currentCluster: Photo[] = [];
-
-    for (let i = 0; i < photos.length; i++) {
-      const currentPhoto = photos[i];
-      
-      if (currentCluster.length === 0) {
-        currentCluster.push(currentPhoto);
-        continue;
-      }
-
-      const lastPhoto = currentCluster[currentCluster.length - 1];
-      
-      // Check if current photo belongs to current cluster
-      if (this.shouldClusterWith(lastPhoto, currentPhoto, config)) {
-        currentCluster.push(currentPhoto);
-      } else {
-        // Start new cluster
-        if (currentCluster.length >= config.minPhotos) {
-          clusters.push([...currentCluster]);
-        }
-        currentCluster = [currentPhoto];
-      }
-    }
-
-    // Add the last cluster
-    if (currentCluster.length >= config.minPhotos) {
-      clusters.push(currentCluster);
-    }
-
-    return clusters;
-  }
-
-  /**
-   * Determine if two photos should be clustered together
-   */
-  private shouldClusterWith(photo1: Photo, photo2: Photo, config: AutoClusterConfig): boolean {
-    if (!photo1.location || !photo2.location || !photo1.metadata.takenAt || !photo2.metadata.takenAt) {
-      return false;
-    }
-
-    const time1 = new Date(photo1.metadata.takenAt).getTime();
-    const time2 = new Date(photo2.metadata.takenAt).getTime();
-    const timeDiff = Math.abs(time1 - time2) / (1000 * 60 * 60); // hours
-
-    const distance = PhotoMetadataUtil.calculateDistance(
-      photo1.location.latitude,
-      photo1.location.longitude,
-      photo2.location.latitude,
-      photo2.location.longitude
-    );
-
-    return timeDiff <= config.maxTimeGap && distance <= config.maxDistance;
-  }
-
-  /**
-   * Create trip from photo cluster
-   */
-  private async createTripFromCluster(
-    userId: string, 
-    photos: Photo[]
-  ): Promise<{ trip: Trip | null; error?: string }> {
-    const sortedPhotos = photos.sort((a, b) => 
-      new Date(a.metadata.takenAt || a.createdAt).getTime() - 
-      new Date(b.metadata.takenAt || b.createdAt).getTime()
-    );
-
-    const startDate = sortedPhotos[0].metadata.takenAt || sortedPhotos[0].createdAt;
-    const endDate = sortedPhotos[sortedPhotos.length - 1].metadata.takenAt || 
-                   sortedPhotos[sortedPhotos.length - 1].createdAt;
-
-    const tripName = await this.generateTripName(sortedPhotos);
-
-    return this.createTrip(userId, {
-      name: tripName,
-      photoIds: sortedPhotos.map(p => p.id),
-      startDate,
-      endDate
-    });
-  }
-
-  /**
-   * Generate trip name based on location and date
-   */
-  private async generateTripName(photos: Photo[]): Promise<string> {
-    // This would use reverse geocoding in a real implementation
-    // For now, use a simple name based on date
-    const firstPhoto = photos[0];
-    const date = new Date(firstPhoto.metadata.takenAt || firstPhoto.createdAt);
-    
-    return `Trip - ${date.toLocaleDateString('en-US', { 
-      month: 'long', 
-      year: 'numeric' 
-    })}`;
-  }
-
-  /**
-   * Validate that user owns all photos
-   */
-  private async validatePhotoOwnership(
-    userId: string, 
-    photoIds: string[]
-  ): Promise<{ valid: boolean; error?: string }> {
+  async getUserTrips(userId: string): Promise<TripsResult> {
     try {
-      for (const photoId of photoIds) {
-        const photoDoc = await db.collection('photos').doc(photoId).get();
-        if (!photoDoc.exists) {
-          return { valid: false, error: `Photo ${photoId} not found` };
-        }
-
-        const photo = photoDoc.data() as Photo;
-        if (photo.userId !== userId) {
-          return { valid: false, error: `Access denied for photo ${photoId}` };
-        }
-      }
-      return { valid: true };
-    } catch (error) {
-      return { valid: false, error: 'Error validating photo ownership' };
-    }
-  }
-
-  /**
-   * Calculate trip bounds from photos
-   */
-  private async calculateTripBounds(photoIds: string[]): Promise<Trip['location']> {
-    const photos: Photo[] = [];
-    
-    for (const photoId of photoIds) {
-      const photoDoc = await db.collection('photos').doc(photoId).get();
-      if (photoDoc.exists) {
-        photos.push({ id: photoDoc.id, ...photoDoc.data() } as Photo);
-      }
-    }
-
-    const locations = photos.filter(p => p.location).map(p => p.location!);
-    
-    if (locations.length === 0) {
-      // Default bounds if no locations
-      return {
-        center: { latitude: 0, longitude: 0 },
-        boundingBox: { north: 0, south: 0, east: 0, west: 0 }
-      };
-    }
-
-    const latitudes = locations.map(loc => loc.latitude);
-    const longitudes = locations.map(loc => loc.longitude);
-
-    return {
-      center: {
-        latitude: latitudes.reduce((a, b) => a + b) / latitudes.length,
-        longitude: longitudes.reduce((a, b) => a + b) / longitudes.length
-      },
-      boundingBox: {
-        north: Math.max(...latitudes),
-        south: Math.min(...latitudes),
-        east: Math.max(...longitudes),
-        west: Math.min(...longitudes)
-      }
-    };
-  }
-
-  /**
-   * Update photos with trip ID
-   */
-  private async updatePhotosWithTripId(photoIds: string[], tripId: string): Promise<void> {
-    const batch = db.batch();
-
-    for (const photoId of photoIds) {
-      const photoRef = db.collection('photos').doc(photoId);
-      batch.update(photoRef, { tripId });
-    }
-
-    await batch.commit();
-  }
-
-  /**
-   * Generate tags for trip
-   */
-  private generateTripTags(name: string, location: Trip['location']): string[] {
-    const tags: string[] = [];
-    
-    // Add location-based tags
-    tags.push(`lat-${Math.round(location.center.latitude * 100)/100}`);
-    tags.push(`lng-${Math.round(location.center.longitude * 100)/100}`);
-    
-    // Add name-based tags
-    const nameWords = name.toLowerCase().split(' ');
-    tags.push(...nameWords.filter(word => word.length > 2));
-
-    return tags;
-  }
-
-  /**
-   * Get user trips
-   */
-  async getUserTrips(userId: string): Promise<{ trips: Trip[]; error?: string }> {
-    try {
-      const snapshot = await db.collection('trips')
+      const snapshot = await this.tripsCollection
         .where('userId', '==', userId)
         .orderBy('startDate', 'desc')
         .get();
 
       const trips: Trip[] = [];
       snapshot.forEach(doc => {
-        trips.push({ id: doc.id, ...doc.data() } as Trip);
+        trips.push(doc.data() as Trip);
       });
 
       return { trips };
     } catch (error: any) {
-      console.error('Error fetching trips:', error);
-      return { trips: [], error: 'Failed to fetch trips' };
+      console.error('Get trips error:', error);
+      return { error: error.message || 'Failed to retrieve trips' };
     }
+  }
+
+  /**
+   * Get single trip by ID
+   */
+  async getTripById(tripId: string, userId: string): Promise<TripResult> {
+    try {
+      const doc = await this.tripsCollection.doc(tripId).get();
+
+      if (!doc.exists) {
+        return { error: 'Trip not found' };
+      }
+
+      const trip = doc.data() as Trip;
+
+      if (trip.userId !== userId) {
+        return { error: 'Access denied' };
+      }
+
+      return { trip };
+    } catch (error: any) {
+      console.error('Get trip error:', error);
+      return { error: error.message || 'Failed to retrieve trip' };
+    }
+  }
+
+  /**
+   * Update trip
+   */
+  async updateTrip(tripId: string, userId: string, updates: Partial<Trip>): Promise<TripResult> {
+    try {
+      const doc = await this.tripsCollection.doc(tripId).get();
+
+      if (!doc.exists) {
+        return { error: 'Trip not found' };
+      }
+
+      const trip = doc.data() as Trip;
+
+      if (trip.userId !== userId) {
+        return { error: 'Access denied' };
+      }
+
+      const allowedUpdates: any = {
+        updatedAt: new Date().toISOString()
+      };
+
+      if (updates.name) allowedUpdates.name = updates.name;
+      if (updates.description !== undefined) allowedUpdates.description = updates.description;
+      if (updates.startDate) allowedUpdates.startDate = updates.startDate;
+      if (updates.endDate) allowedUpdates.endDate = updates.endDate;
+      if (updates.coverPhotoUrl) allowedUpdates.coverPhotoUrl = updates.coverPhotoUrl;
+
+      await this.tripsCollection.doc(tripId).update(allowedUpdates);
+
+      const updatedDoc = await this.tripsCollection.doc(tripId).get();
+      return { trip: updatedDoc.data() as Trip };
+    } catch (error: any) {
+      console.error('Update trip error:', error);
+      return { error: error.message || 'Failed to update trip' };
+    }
+  }
+
+  /**
+   * Delete trip
+   */
+  async deleteTrip(tripId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const doc = await this.tripsCollection.doc(tripId).get();
+
+      if (!doc.exists) {
+        return { success: false, error: 'Trip not found' };
+      }
+
+      const trip = doc.data() as Trip;
+
+      if (trip.userId !== userId) {
+        return { success: false, error: 'Access denied' };
+      }
+
+      // Remove tripId from photos
+      const batch = db.batch();
+      trip.photoIds.forEach(photoId => {
+        const photoRef = this.photosCollection.doc(photoId);
+        batch.update(photoRef, {
+          tripId: null,
+          updatedAt: new Date().toISOString()
+        });
+      });
+      await batch.commit();
+
+      // Delete trip
+      await this.tripsCollection.doc(tripId).delete();
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('Delete trip error:', error);
+      return { success: false, error: error.message || 'Failed to delete trip' };
+    }
+  }
+
+  /**
+   * Add photos to trip
+   */
+  async addPhotosToTrip(tripId: string, userId: string, photoIds: string[]): Promise<TripResult> {
+    try {
+      const doc = await this.tripsCollection.doc(tripId).get();
+
+      if (!doc.exists) {
+        return { error: 'Trip not found' };
+      }
+
+      const trip = doc.data() as Trip;
+
+      if (trip.userId !== userId) {
+        return { error: 'Access denied' };
+      }
+
+      // Validate photos
+      const photoRefs = await Promise.all(
+        photoIds.map(id => this.photosCollection.doc(id).get())
+      );
+      
+      const validPhotoIds = photoRefs
+        .filter(ref => ref.exists && ref.data()?.userId === userId)
+        .map(ref => ref.id);
+
+      // Update trip with new photos
+      const updatedPhotoIds = [...new Set([...trip.photoIds, ...validPhotoIds])];
+      
+      await this.tripsCollection.doc(tripId).update({
+        photoIds: updatedPhotoIds,
+        updatedAt: new Date().toISOString()
+      });
+
+      // Update photos with tripId
+      const batch = db.batch();
+      validPhotoIds.forEach(photoId => {
+        const photoRef = this.photosCollection.doc(photoId);
+        batch.update(photoRef, {
+          tripId,
+          updatedAt: new Date().toISOString()
+        });
+      });
+      await batch.commit();
+
+      const updatedDoc = await this.tripsCollection.doc(tripId).get();
+      return { trip: updatedDoc.data() as Trip };
+    } catch (error: any) {
+      console.error('Add photos to trip error:', error);
+      return { error: error.message || 'Failed to add photos to trip' };
+    }
+  }
+
+  /**
+   * Auto-cluster photos into trips based on location and time proximity
+   */
+  async autoClusterPhotos(
+    userId: string, 
+    options: ClusterOptions = { maxDistance: 50, maxTimeGap: 24, minPhotos: 3 }
+  ): Promise<TripsResult> {
+    try {
+      // Get all photos with location that aren't in trips
+      const snapshot = await this.photosCollection
+        .where('userId', '==', userId)
+        .where('tags', 'array-contains', 'has-location')
+        .orderBy('metadata.takenAt', 'asc')
+        .get();
+
+      const photos: Photo[] = [];
+      snapshot.forEach(doc => {
+        const photo = doc.data() as Photo;
+        if (photo.metadata.gps && photo.metadata.takenAt && !photo.tripId) {
+          photos.push(photo);
+        }
+      });
+
+      if (photos.length < options.minPhotos) {
+        return { trips: [] };
+      }
+
+      // Cluster algorithm
+      const clusters: Photo[][] = [];
+      let currentCluster: Photo[] = [photos[0]];
+
+      for (let i = 1; i < photos.length; i++) {
+        const prevPhoto = photos[i - 1];
+        const currPhoto = photos[i];
+
+        const distance = PhotoMetadataUtil.calculateDistance(
+          prevPhoto.metadata.gps!.latitude,
+          prevPhoto.metadata.gps!.longitude,
+          currPhoto.metadata.gps!.latitude,
+          currPhoto.metadata.gps!.longitude
+        );
+
+        const timeGap = (new Date(currPhoto.metadata.takenAt!).getTime() - 
+                        new Date(prevPhoto.metadata.takenAt!).getTime()) / (1000 * 60 * 60);
+
+        if (distance <= options.maxDistance && timeGap <= options.maxTimeGap) {
+          currentCluster.push(currPhoto);
+        } else {
+          if (currentCluster.length >= options.minPhotos) {
+            clusters.push(currentCluster);
+          }
+          currentCluster = [currPhoto];
+        }
+      }
+
+      // Add last cluster
+      if (currentCluster.length >= options.minPhotos) {
+        clusters.push(currentCluster);
+      }
+
+      // Create trips from clusters
+      const createdTrips: Trip[] = [];
+      
+      for (const cluster of clusters) {
+        const startDate = cluster[0].metadata.takenAt!;
+        const endDate = cluster[cluster.length - 1].metadata.takenAt!;
+        
+        const startDateObj = new Date(startDate);
+        const tripName = `Trip to ${this.getApproximateLocation(cluster[0])} - ${startDateObj.toLocaleDateString()}`;
+        
+        const result = await this.createTrip(userId, {
+          name: tripName,
+          description: `Auto-generated trip with ${cluster.length} photos`,
+          photoIds: cluster.map(p => p.id),
+          startDate,
+          endDate
+        });
+
+        if (result.trip) {
+          createdTrips.push(result.trip);
+        }
+      }
+
+      return { trips: createdTrips };
+    } catch (error: any) {
+      console.error('Auto-cluster error:', error);
+      return { error: error.message || 'Failed to auto-cluster photos' };
+    }
+  }
+
+  /**
+   * Calculate trip location from photos
+   */
+  private calculateTripLocation(photos: Photo[]): TripLocation {
+    const lats = photos.map(p => p.metadata.gps!.latitude);
+    const lngs = photos.map(p => p.metadata.gps!.longitude);
+
+    const centerLat = lats.reduce((sum, lat) => sum + lat, 0) / lats.length;
+    const centerLng = lngs.reduce((sum, lng) => sum + lng, 0) / lngs.length;
+
+    return {
+      centerLat,
+      centerLng,
+      boundingBox: {
+        north: Math.max(...lats),
+        south: Math.min(...lats),
+        east: Math.max(...lngs),
+        west: Math.min(...lngs)
+      }
+    };
+  }
+
+  /**
+   * Get approximate location name (placeholder - would use reverse geocoding in production)
+   */
+  private getApproximateLocation(photo: Photo): string {
+    // In production, use Google Geocoding API here
+    // For now, return coordinates
+    if (photo.metadata.gps) {
+      return `${photo.metadata.gps.latitude.toFixed(2)}, ${photo.metadata.gps.longitude.toFixed(2)}`;
+    }
+    return 'Unknown Location';
   }
 }
 
-export const tripService = TripService.getInstance();
+export const tripService = new TripService();

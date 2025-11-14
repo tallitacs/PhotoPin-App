@@ -1,25 +1,48 @@
+export interface TripLocation {
+  centerLat: number;
+  centerLng: number;
+  boundingBox: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  };
+}
+
 export interface Trip {
   id: string;
   userId: string;
   name: string;
   description?: string;
-  startDate: Date;
-  endDate: Date;
-  location: {
-    latitude: number;
-    longitude: number;
-    name: string;
-  };
+  startDate: string;
+  endDate: string;
   photoIds: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  coverPhotoUrl?: string;
+  location?: TripLocation;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface MapPin {
-  id: string;
-  latitude: number;
-  longitude: number;
+export interface TripInput {
+  name: string;
+  description?: string;
   photoIds: string[];
-  locationName: string;
-  photoCount: number;
+  startDate: string;
+  endDate: string;
+}
+
+export interface TripResult {
+  trip?: Trip;
+  error?: string;
+}
+
+export interface TripsResult {
+  trips?: Trip[];
+  error?: string;
+}
+
+export interface ClusterOptions {
+  maxDistance: number;
+  maxTimeGap: number;
+  minPhotos: number;
 }

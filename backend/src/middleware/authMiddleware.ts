@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { auth } from '../config/firebaseAdmin';
 
 export interface AuthenticatedRequest extends Request {
-  user?: {
+  user: {
     uid: string;
     email?: string;
     displayName?: string;
@@ -12,56 +12,58 @@ export interface AuthenticatedRequest extends Request {
 /**
  * Authentication middleware to verify Firebase ID tokens
  */
-export const authenticateToken = async (
-  req: AuthenticatedRequest,
+export const authenticateToken = (
+  req: Request,
   res: Response,
   next: NextFunction
-) => {
-  try {
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authorization token required'
-      });
-    }
-
-    const token = authHeader.split('Bearer ')[1];
-    
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid authorization format'
-      });
-    }
-
-    // Verify Firebase token
-    const decodedToken = await auth.verifyIdToken(token);
-    req.user = {
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      displayName: decodedToken.name
-    };
-
-    next();
-  } catch (error) {
-    console.error('Authentication error:', error);
-    return res.status(401).json({
+): void => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    res.status(401).json({
       success: false,
-      error: 'Invalid or expired token'
+      error: 'Authorization token required'
     });
+    return;
   }
+
+  const token = authHeader.split('Bearer ')[1];
+  
+  if (!token) {
+    res.status(401).json({
+      success: false,
+      error: 'Invalid authorization format'
+    });
+    return;
+  }
+
+  // Verify Firebase token
+  auth.verifyIdToken(token)
+    .then((decodedToken) => {
+      req.user = {
+        uid: decodedToken.uid,
+        email: decodedToken.email,
+        displayName: decodedToken.name
+      };
+      next();
+    })
+    .catch((error) => {
+      console.error('Authentication error:', error);
+      res.status(401).json({
+        success: false,
+        error: 'Invalid or expired token'
+      });
+    });
 };
 
 /**
  * Optional authentication middleware
  */
 export const optionalAuthenticate = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     
@@ -73,11 +75,23 @@ export const optionalAuthenticate = async (
         email: decodedToken.email,
         displayName: decodedToken.name
       };
+    } else {
+      // Set a default user object for optional routes
+      req.user = {
+        uid: 'anonymous',
+        email: undefined,
+        displayName: undefined
+      };
     }
 
     next();
   } catch (error) {
-    // Continue without authentication for optional routes
+    // Continue with anonymous user for optional routes
+    req.user = {
+      uid: 'anonymous',
+      email: undefined,
+      displayName: undefined
+    };
     next();
   }
 };
