@@ -4,11 +4,13 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { environment } from './environment/environment';
 import { errorHandler } from './middleware/errorHandler';
+import googlePhotosRoutes from './routes/googlePhotosRoutes';
 
 // Routes
 import photoRoutes from './routes/photoRoutes';
 import tripRoutes from './routes/tripRoutes';
 import { authRoutes } from './routes/authRoutes';
+
 
 const app = express();
 
@@ -47,6 +49,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/photos', photoRoutes);
 app.use('/api/trips', tripRoutes);
+app.use('/api/google-photos', googlePhotosRoutes);
 
 // Error handling
 app.use(errorHandler);

@@ -1,23 +1,30 @@
 import { Router, Request, Response } from 'express';
 import { authenticateToken } from '../middleware/authMiddleware';
-// Import the correct type (though not strictly needed here, it's good practice)
+import { AuthController } from '../controllers/AuthController';
 import { AuthenticatedRequest } from '../@types/express';
 
 const router = Router();
 
+// Register new user
+router.post('/register', (req: Request, res: Response) => 
+  AuthController.register(req as AuthenticatedRequest, res)
+);
+
 // Verify token endpoint
-// FIX: Use the base Request type. Express provides this to the handler.
 router.get('/verify', authenticateToken, (req: Request, res: Response) => {
   res.json({
     success: true,
     user: {
-      // Use the non-null assertion '!' because we know
-      // 'authenticateToken' ran successfully and added req.user
       uid: req.user!.uid,
       email: req.user!.email,
       displayName: req.user!.displayName
     }
   });
 });
+
+// Get user profile
+router.get('/profile', authenticateToken, (req: Request, res: Response) => 
+  AuthController.getProfile(req as AuthenticatedRequest, res)
+);
 
 export { router as authRoutes };

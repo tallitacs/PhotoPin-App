@@ -3,9 +3,9 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
-import { AuthProvider } from './hooks/useAuth'; // We will create this
+import { AuthProvider } from './hooks/useAuth';
+import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
-// A simple theme based on your manifest.json theme_color
 const theme = createTheme({
   palette: {
     primary: {
@@ -33,3 +33,6 @@ root.render(
     </ThemeProvider>
   </React.StrictMode>
 );
+
+// Register service worker
+serviceWorkerRegistration.register();
