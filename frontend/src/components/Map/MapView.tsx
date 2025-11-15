@@ -1,50 +1,53 @@
 import React, { useEffect, useState } from 'react';
-import { GoogleMap, useLoadScript } from '@react-google-maps/api';
-import { Box, CircularProgress } from '@mui/material';
-import { MapMarker } from './MapMarker';
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
+import { Box, CircularProgress, Alert } from '@mui/material';
 import { PhotoMetadata } from '../../types/photo.types';
-import apiService from '../../services/api.service';
+import * as api from '../../services/api.service';
 
-const mapContainerStyle = {
+const containerStyle = {
   width: '100%',
-  height: '600px'
+  height: '80vh', // Adjust height as needed
 };
 
-const defaultCenter = {
-  lat: 40.7128,
-  lng: -74.0060
+// Default center (e.g., world map)
+const center = {
+  lat: 20,
+  lng: 0,
 };
 
-interface MapViewProps {
-  onPhotoClick?: (photo: PhotoMetadata) => void;
-}
-
-export const MapView: React.FC<MapViewProps> = ({ onPhotoClick }) => {
-  const [photos, setPhotos] = useState<PhotoMetadata[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || ''
+export const MapView: React.FC = () => {
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY!,
   });
 
+  const [pins, setPins] = useState<PhotoMetadata[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    loadMapPins();
+    const fetchPins = async () => {
+      try {
+        const data = await api.getMapPins();
+        if (data.success) {
+          // Filter out any photos that might not have location data
+          setPins(data.photos.filter(p => p.location));
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPins();
   }, []);
 
-  const loadMapPins = async () => {
-    try {
-      const response = await apiService.getMapPins();
-      setPhotos(response.data);
-    } catch (err) {
-      console.error('Failed to load map pins:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (loadError) {
+    return <Alert severity="error">Error loading Google Maps</Alert>;
+  }
 
   if (!isLoaded || loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="600px">
+      <Box display="flex" justifyContent="center" mt={4}>
         <CircularProgress />
       </Box>
     );
@@ -52,18 +55,20 @@ export const MapView: React.FC<MapViewProps> = ({ onPhotoClick }) => {
 
   return (
     <GoogleMap
-      mapContainerStyle={mapContainerStyle}
-      zoom={10}
-      center={defaultCenter}
+      mapContainerStyle={containerStyle}
+      center={center}
+      zoom={2}
     >
-      {photos.map((photo) => (
-        photo.location && (
-          <MapMarker
-            key={photo.id}
-            photo={photo}
-            onClick={onPhotoClick}
-          />
-        )
+      {pins.map((pin) => (
+        <Marker
+          key={pin.id}
+          position={{
+            lat: pin.location!.latitude,
+            lng: pin.location!.longitude,
+          }}
+          // You can add an InfoWindow onClick later
+        />
       ))}
     </GoogleMap>
   );
+};

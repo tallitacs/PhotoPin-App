@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Grid, Paper } from '@mui/material';
-import { PhotoCard } from '../photos/PhotoCard';
+import { PhotoCard } from '../Photos/PhotoCard';
 import { PhotoMetadata } from '../../types/photo.types';
 import { format } from 'date-fns';
 

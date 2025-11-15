@@ -1,140 +1,106 @@
 import React, { useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { 
   Box, 
-  TextField, 
   Button, 
+  TextField, 
   Typography, 
-  Alert,
-  Divider,
-  Paper
+  Container, 
+  Paper,
+  Grid,
+  Link
 } from '@mui/material';
-import GoogleIcon from '@mui/icons-material/Google';
-import { useAuth } from '../../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
 
 export const SignupForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const { signUp, signInWithGoogle } = useAuth();
+  const [confirmPass, setConfirmPass] = useState('');
+  const [error, setError] = useState('');
+  const { signup } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-
-    if (password !== confirmPassword) {
+    if (password !== confirmPass) {
       setError('Passwords do not match');
       return;
     }
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
-    setLoading(true);
-    const { user, error } = await signUp(email, password);
-    setLoading(false);
-
-    if (error) {
-      setError(error);
-    } else if (user) {
-      navigate('/');
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    setError(null);
-    setLoading(true);
-
-    const { user, error } = await signInWithGoogle();
-    setLoading(false);
-
-    if (error) {
-      setError(error);
-    } else if (user) {
-      navigate('/');
+    setError('');
+    try {
+      const user = await signup(email, password);
+      if (user) {
+        navigate('/');
+      } else {
+        setError('Failed to sign up. This email may already be in use.');
+      }
+    } catch (err) {
+      setError('An error occurred. Please try again.');
     }
   };
 
   return (
-    <Paper elevation={3} sx={{ p: 4, maxWidth: 400, mx: 'auto', mt: 8 }}>
-      <Typography variant="h4" component="h1" gutterBottom textAlign="center">
-        Create Account
-      </Typography>
-      <Typography variant="body2" color="text.secondary" textAlign="center" mb={3}>
-        Start organizing your photo memories
-      </Typography>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      <Box component="form" onSubmit={handleSubmit}>
-        <TextField
-          label="Email"
-          type="email"
-          fullWidth
-          margin="normal"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          disabled={loading}
-        />
-        <TextField
-          label="Password"
-          type="password"
-          fullWidth
-          margin="normal"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          disabled={loading}
-        />
-        <TextField
-          label="Confirm Password"
-          type="password"
-          fullWidth
-          margin="normal"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          required
-          disabled={loading}
-        />
-        <Button
-          type="submit"
-          variant="contained"
-          fullWidth
-          sx={{ mt: 2, mb: 2 }}
-          disabled={loading}
-        >
-          {loading ? 'Creating account...' : 'Sign Up'}
-        </Button>
-      </Box>
-
-      <Divider sx={{ my: 2 }}>OR</Divider>
-
-      <Button
-        variant="outlined"
-        fullWidth
-        startIcon={<GoogleIcon />}
-        onClick={handleGoogleSignIn}
-        disabled={loading}
-      >
-        Sign up with Google
-      </Button>
-
-      <Typography variant="body2" textAlign="center" mt={2}>
-        Already have an account?{' '}
-        <Button onClick={() => navigate('/login')} sx={{ textTransform: 'none' }}>
-          Sign in
-        </Button>
-      </Typography>
-    </Paper>
+    <Container component="main" maxWidth="xs">
+      <Paper elevation={3} sx={{ mt: 8, p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Typography component="h1" variant="h5">
+          Sign up for PhotoPin
+        </Typography>
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="email"
+            label="Email Address"
+            name="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            name="password"
+            label="Password"
+            type="password"
+            id="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            name="confirmPassword"
+            label="Confirm Password"
+            type="password"
+            id="confirmPassword"
+            value={confirmPass}
+            onChange={(e) => setConfirmPass(e.target.value)}
+          />
+          {error && (
+            <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+              {error}
+            </Typography>
+          )}
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            sx={{ mt: 3, mb: 2 }}
+          >
+            Sign Up
+          </Button>
+           <Grid container justifyContent="flex-end">
+            <Grid item>
+              <Link component={RouterLink} to="/login" variant="body2">
+                {"Already have an account? Sign in"}
+              </Link>
+            </Grid>
+          </Grid>
+        </Box>
+      </Paper>
+    </Container>
   );
 };

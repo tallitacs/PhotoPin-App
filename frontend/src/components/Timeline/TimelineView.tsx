@@ -1,70 +1,65 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, CircularProgress } from '@mui/material';
-import { TimelineItem } from './TimelineItem';
+import { Box, Typography, CircularProgress, Alert } from '@mui/material';
+import { TimelineItem } from './TimelineItem'; // You already have this
 import { PhotoMetadata } from '../../types/photo.types';
-import apiService from '../../services/api.service';
-
-interface TimelineViewProps {
-  year?: number;
-  onPhotoClick?: (photo: PhotoMetadata) => void;
-}
+import * as api from '../../services/api.service';
 
 interface TimelineGroup {
   date: string;
   photos: PhotoMetadata[];
 }
 
-export const TimelineView: React.FC<TimelineViewProps> = ({ 
-  year, 
-  onPhotoClick 
-}) => {
+export const TimelineView: React.FC = () => {
   const [timeline, setTimeline] = useState<TimelineGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadTimeline();
-  }, [year]);
-
-  const loadTimeline = async () => {
-    try {
-      setLoading(true);
-      const response = await apiService.getTimeline(year);
-      setTimeline(response.data);
-    } catch (err) {
-      console.error('Failed to load timeline:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchTimeline = async () => {
+      try {
+        setLoading(true);
+        const data = await api.getTimeline(); // Using our API service
+        if (data.success) {
+          setTimeline(data.timeline);
+        } else {
+          setError('Failed to fetch timeline.');
+        }
+      } catch (err) {
+        setError('An error occurred while fetching timeline.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTimeline();
+  }, []);
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" p={4}>
+      <Box display="flex" justifyContent="center" mt={4}>
         <CircularProgress />
       </Box>
     );
   }
 
-  if (timeline.length === 0) {
-    return (
-      <Box p={4} textAlign="center">
-        <Typography color="text.secondary">
-          No photos found for this timeline
-        </Typography>
-      </Box>
-    );
+  if (error) {
+    return <Alert severity="error">{error}</Alert>;
   }
 
   return (
-    <Box p={2}>
-      {timeline.map((group, idx) => (
-        <TimelineItem
-          key={idx}
-          date={group.date}
-          photos={group.photos}
-          onPhotoClick={onPhotoClick}
-        />
-      ))}
+    <Box>
+      <Typography variant="h4" gutterBottom>
+        Your Timeline
+      </Typography>
+      {timeline.length === 0 ? (
+        <Typography>No photos found to build a timeline.</Typography>
+      ) : (
+        <Box>
+          {timeline.map((group) => (
+            <TimelineItem key={group.date} date={group.date} photos={group.photos} />
+          ))}
+        </Box>
+      )}
     </Box>
   );
 };

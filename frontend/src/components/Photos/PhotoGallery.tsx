@@ -1,87 +1,76 @@
 import React, { useEffect, useState } from 'react';
-import { Grid, Box, CircularProgress, Typography } from '@mui/material';
-import { PhotoCard } from './PhotoCard';
+import { Grid, Typography, Box, CircularProgress, Alert } from '@mui/material';
+import { PhotoCard } from './PhotoCard'; // You already have this
 import { PhotoMetadata } from '../../types/photo.types';
-import apiService from '../../services/api.service';
+import * as api from '../../services/api.service';
 
-interface PhotoGalleryProps {
-  filters?: any;
-  onPhotoClick?: (photo: PhotoMetadata) => void;
-}
-
-export const PhotoGallery: React.FC<PhotoGalleryProps> = ({ 
-  filters, 
-  onPhotoClick 
-}) => {
+export const PhotoGallery: React.FC = () => {
   const [photos, setPhotos] = useState<PhotoMetadata[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadPhotos();
-  }, [filters]);
-
-  const loadPhotos = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await apiService.getPhotos(filters);
-      setPhotos(response.data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load photos');
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchPhotos = async () => {
+      try {
+        setLoading(true);
+        const data = await api.getPhotos(); // Using our API service
+        if (data.success) {
+          setPhotos(data.photos);
+        } else {
+          setError('Failed to fetch photos.');
+        }
+      } catch (err) {
+        setError('An error occurred while fetching photos.');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPhotos();
+  }, []);
 
   const handleDelete = async (photoId: string) => {
-    if (!window.confirm('Are you sure you want to delete this photo?')) return;
-    
     try {
-      await apiService.deletePhoto(photoId);
-      setPhotos(photos.filter(p => p.id !== photoId));
-    } catch (err: any) {
-      alert('Failed to delete photo: ' + err.message);
+      const data = await api.deletePhoto(photoId);
+      if (data.success) {
+        // Remove photo from state
+        setPhotos(prevPhotos => prevPhotos.filter(p => p.id !== photoId));
+      } else {
+        alert('Failed to delete photo.');
+      }
+    } catch (err) {
+      alert('An error occurred.');
     }
   };
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" p={4}>
+      <Box display="flex" justifyContent="center" mt={4}>
         <CircularProgress />
       </Box>
     );
   }
 
   if (error) {
-    return (
-      <Box p={4}>
-        <Typography color="error">{error}</Typography>
-      </Box>
-    );
-  }
-
-  if (photos.length === 0) {
-    return (
-      <Box p={4} textAlign="center">
-        <Typography color="text.secondary">
-          No photos found. Upload some photos to get started!
-        </Typography>
-      </Box>
-    );
+    return <Alert severity="error">{error}</Alert>;
   }
 
   return (
-    <Grid container spacing={2} p={2}>
-      {photos.map((photo) => (
-        <Grid item xs={12} sm={6} md={4} lg={3} key={photo.id}>
-          <PhotoCard 
-            photo={photo} 
-            onDelete={handleDelete}
-            onClick={onPhotoClick}
-          />
+    <Box>
+      <Typography variant="h4" gutterBottom>
+        Your Gallery
+      </Typography>
+      {photos.length === 0 ? (
+        <Typography>No photos found. Try uploading some!</Typography>
+      ) : (
+        <Grid container spacing={3}>
+          {photos.map((photo) => (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={photo.id}>
+              <PhotoCard photo={photo} onDelete={handleDelete} />
+            </Grid>
+          ))}
         </Grid>
-      ))}
-    </Grid>
+      )}
+    </Box>
   );
 };

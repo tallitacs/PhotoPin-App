@@ -1,49 +1,44 @@
+// Based on your PhotoCard.tsx and backend photoMetadata.ts
+export interface PhotoLocation {
+  latitude: number;
+  longitude: number;
+  altitude?: number;
+  city?: string;
+  country?: string;
+  address?: string;
+}
+
 export interface PhotoMetadata {
   id: string;
   userId: string;
   filename: string;
   url: string;
   thumbnailUrl?: string;
-  mimeType: string;
   size: number;
-  
-  // Location data
-  location?: {
-    latitude: number;
-    longitude: number;
-    address?: string;
-    city?: string;
-    country?: string;
-  };
-  
-  // EXIF data
-  exif?: {
-    make?: string;
-    model?: string;
-    dateTime?: string;
-    orientation?: number;
-    exposureTime?: string;
-    fNumber?: string;
-    iso?: number;
-    focalLength?: string;
-  };
-  
-  // User additions
+  format: string;
+  width: number;
+  height: number;
+  takenAt: string; // ISO string
+  createdAt: string; // ISO string
+  updatedAt: string; // ISO string
+
   title?: string;
   description?: string;
   tags?: string[];
-  tripId?: string;
   
-  // Timestamps
-  takenAt?: Date;
-  uploadedAt: Date;
-  updatedAt: Date;
-}
+  // Location
+  gps?: {
+    latitude: number;
+    longitude: number;
+    altitude?: number;
+  };
+  location?: PhotoLocation;
 
-export interface PhotoFilters {
-  startDate?: Date;
-  endDate?: Date;
-  location?: string;
-  tags?: string[];
-  tripId?: string;
+  // EXIF
+  cameraMake?: string;
+  cameraModel?: string;
+  iso?: number;
+  aperture?: string;
+  shutterSpeed?: string;
+  focalLength?: string;
 }

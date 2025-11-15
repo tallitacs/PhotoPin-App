@@ -1,119 +1,92 @@
 import React, { useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { 
   Box, 
-  TextField, 
   Button, 
+  TextField, 
   Typography, 
-  Alert,
-  Divider,
-  Paper
+  Container, 
+  Paper, 
+  Grid,
+  Link 
 } from '@mui/material';
-import GoogleIcon from '@mui/icons-material/Google';
-import { useAuth } from '../../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
 
 export const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const { signIn, signInWithGoogle } = useAuth();
+  const [error, setError] = useState('');
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    const { user, error } = await signIn(email, password);
-    setLoading(false);
-
-    if (error) {
-      setError(error);
-    } else if (user) {
-      navigate('/');
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    setError(null);
-    setLoading(true);
-
-    const { user, error } = await signInWithGoogle();
-    setLoading(false);
-
-    if (error) {
-      setError(error);
-    } else if (user) {
-      navigate('/');
+    setError('');
+    try {
+      const user = await login(email, password);
+      if (user) {
+        navigate('/');
+      } else {
+        setError('Failed to log in. Please check your credentials.');
+      }
+    } catch (err) {
+      setError('An error occurred. Please try again.');
     }
   };
 
   return (
-    <Paper elevation={3} sx={{ p: 4, maxWidth: 400, mx: 'auto', mt: 8 }}>
-      <Typography variant="h4" component="h1" gutterBottom textAlign="center">
-        PhotoPin
-      </Typography>
-      <Typography variant="body2" color="text.secondary" textAlign="center" mb={3}>
-        Sign in to organize your memories
-      </Typography>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-
-      <Box component="form" onSubmit={handleSubmit}>
-        <TextField
-          label="Email"
-          type="email"
-          fullWidth
-          margin="normal"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          disabled={loading}
-        />
-        <TextField
-          label="Password"
-          type="password"
-          fullWidth
-          margin="normal"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          disabled={loading}
-        />
-        <Button
-          type="submit"
-          variant="contained"
-          fullWidth
-          sx={{ mt: 2, mb: 2 }}
-          disabled={loading}
-        >
-          {loading ? 'Signing in...' : 'Sign In'}
-        </Button>
-      </Box>
-
-      <Divider sx={{ my: 2 }}>OR</Divider>
-
-      <Button
-        variant="outlined"
-        fullWidth
-        startIcon={<GoogleIcon />}
-        onClick={handleGoogleSignIn}
-        disabled={loading}
-      >
-        Continue with Google
-      </Button>
-
-      <Typography variant="body2" textAlign="center" mt={2}>
-        Don't have an account?{' '}
-        <Button onClick={() => navigate('/signup')} sx={{ textTransform: 'none' }}>
-          Sign up
-        </Button>
-      </Typography>
-    </Paper>
+    <Container component="main" maxWidth="xs">
+      <Paper elevation={3} sx={{ mt: 8, p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Typography component="h1" variant="h5">
+          Sign in to PhotoPin
+        </Typography>
+        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="email"
+            label="Email Address"
+            name="email"
+            autoComplete="email"
+            autoFocus
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            name="password"
+            label="Password"
+            type="password"
+            id="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          {error && (
+            <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+              {error}
+            </Typography>
+          )}
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            sx={{ mt: 3, mb: 2 }}
+          >
+            Sign In
+          </Button>
+          <Grid container>
+            <Grid item>
+              <Link component={RouterLink} to="/signup" variant="body2">
+                {"Don't have an account? Sign Up"}
+              </Link>
+            </Grid>
+          </Grid>
+        </Box>
+      </Paper>
+    </Container>
   );
 };

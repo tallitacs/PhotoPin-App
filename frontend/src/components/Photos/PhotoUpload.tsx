@@ -1,97 +1,106 @@
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import {
-  Box,
-  Typography,
-  LinearProgress,
-  Paper,
-  Alert
-} from '@mui/material';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import apiService from '../../services/api.service';
+import { Box, Typography, Button, Paper, CircularProgress, Alert, List, ListItem, ListItemText } from '@mui/material';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import * as api from '../../services/api.service';
 
-interface PhotoUploadProps {
-  onUploadComplete?: () => void;
-}
-
-export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadComplete }) => {
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
+export const PhotoUpload: React.FC = () => {
+  const [files, setFiles] = useState<File[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return;
-
-    setUploading(true);
-    setError(null);
-    setProgress(0);
-
-    try {
-      const totalFiles = acceptedFiles.length;
-      let completed = 0;
-
-      for (const file of acceptedFiles) {
-        await apiService.uploadPhoto(file);
-        completed++;
-        setProgress((completed / totalFiles) * 100);
-      }
-
-      onUploadComplete?.();
-    } catch (err: any) {
-      setError(err.message || 'Upload failed');
-    } finally {
-      setUploading(false);
-      setProgress(0);
-    }
-  }, [onUploadComplete]);
+  const [uploadResult, setUploadResult] = useState<{ uploaded: any[], errors: any[] } | null>(null);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.heic']
+    onDrop: (acceptedFiles) => {
+      setFiles(prev => [...prev, ...acceptedFiles]);
     },
-    multiple: true,
-    disabled: uploading
+    accept: {
+      'image/jpeg': [],
+      'image/png': [],
+      'image/webp': [],
+      'image/gif': [],
+      'image/heic': [],
+    }
   });
 
-  return (
-    <Box>
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+  const handleUpload = async () => {
+    if (files.length === 0) return;
+    
+    setLoading(true);
+    setError(null);
+    setUploadResult(null);
 
-      <Paper
+    try {
+      const data = await api.uploadPhotos(files);
+      if (data.success) {
+        setUploadResult({ uploaded: data.uploaded, errors: data.errors });
+        setFiles([]); // Clear queue on success
+      } else {
+        setError(data.error || 'Upload failed.');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.message || 'An error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Paper elevation={3} sx={{ p: 4 }}>
+      <Typography variant="h5" gutterBottom>
+        Upload Photos
+      </Typography>
+      
+      <Box
         {...getRootProps()}
         sx={{
+          border: `2px dashed ${isDragActive ? 'primary.main' : 'grey.500'}`,
+          borderRadius: 2,
           p: 4,
           textAlign: 'center',
-          cursor: uploading ? 'default' : 'pointer',
-          border: '2px dashed',
-          borderColor: isDragActive ? 'primary.main' : 'grey.300',
+          cursor: 'pointer',
           backgroundColor: isDragActive ? 'action.hover' : 'background.paper',
-          transition: 'all 0.2s'
+          mb: 2
         }}
       >
         <input {...getInputProps()} />
-        <CloudUploadIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-        <Typography variant="h6" gutterBottom>
-          {isDragActive ? 'Drop photos here' : 'Upload Photos'}
+        <UploadFileIcon sx={{ fontSize: 48, color: 'text.secondary' }} />
+        <Typography>
+          {isDragActive
+            ? 'Drop the files here...'
+            : "Drag 'n' drop some files here, or click to select files"}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Drag and drop photos here, or click to select files
-        </Typography>
-      </Paper>
+      </Box>
 
-      {uploading && (
-        <Box mt={2}>
-          <Typography variant="body2" gutterBottom>
-            Uploading... {Math.round(progress)}%
-          </Typography>
-          <LinearProgress variant="determinate" value={progress} />
+      {files.length > 0 && (
+        <Box mb={2}>
+          <Typography variant="h6">Files to upload:</Typography>
+          <List dense>
+            {files.map((file, i) => (
+              <ListItem key={i}>
+                <ListItemText primary={file.name} secondary={`${(file.size / 1024 / 1024).toFixed(2)} MB`} />
+              </ListItem>
+            ))}
+          </List>
         </Box>
       )}
-    </Box>
+      
+      <Button
+        variant="contained"
+        onClick={handleUpload}
+        disabled={files.length === 0 || loading}
+        startIcon={loading ? <CircularProgress size={20} /> : <UploadFileIcon />}
+      >
+        {loading ? 'Uploading...' : `Upload ${files.length} File(s)`}
+      </Button>
+
+      {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+      {uploadResult && (
+        <Alert severity="success" sx={{ mt: 2 }}>
+          Successfully uploaded {uploadResult.uploaded.length} photos.
+          {uploadResult.errors.length > 0 && ` Failed to upload ${uploadResult.errors.length}.`}
+        </Alert>
+      )}
+    </Paper>
   );
 };

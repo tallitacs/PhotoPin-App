@@ -1,116 +1,103 @@
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
-import { auth } from '../config/firebase';
+import axios from 'axios';
+import { auth } from '../config/firebase'; // Import client-side auth
+import { PhotoMetadata } from '../types/photo.types';
+import { Trip } from '../types/trip.types';
 
-class ApiService {
-  private api: AxiosInstance;
-  
-  constructor() {
-    this.api = axios.create({
-      baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
-      timeout: 30000,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    this.setupInterceptors();
-  }
-  
-  private setupInterceptors() {
-    // Request interceptor - add auth token
-    this.api.interceptors.request.use(
-      async (config) => {
-        const user = auth.currentUser;
-        if (user) {
-          const token = await user.getIdToken();
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-      },
-      (error) => Promise.reject(error)
-    );
-    
-    // Response interceptor - handle errors
-    this.api.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        if (error.response?.status === 401) {
-          // Token expired, try to refresh
-          try {
-            const user = auth.currentUser;
-            if (user) {
-              const token = await user.getIdToken(true); // Force refresh
-              error.config.headers.Authorization = `Bearer ${token}`;
-              return this.api.request(error.config);
-            }
-          } catch (refreshError) {
-            // Redirect to login
-            window.location.href = '/login';
-          }
-        }
-        return Promise.reject(error);
-      }
-    );
-  }
-  
-  // Photo endpoints
-  async uploadPhoto(file: File, metadata?: any) {
-    const formData = new FormData();
-    formData.append('photo', file);
-    if (metadata) {
-      Object.keys(metadata).forEach(key => {
-        formData.append(key, metadata[key]);
-      });
+// Create an axios instance
+const api = axios.create({
+  baseURL: process.env.REACT_APP_API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Interceptor to add the Firebase auth token to every request
+api.interceptors.request.use(
+  async (config) => {
+    const user = auth.currentUser;
+    if (user) {
+      const token = await user.getIdToken();
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    return this.api.post('/photos/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-  
-  async getPhotos(filters?: any) {
-    return this.api.get('/photos', { params: filters });
-  }
-  
-  async getPhoto(photoId: string) {
-    return this.api.get(`/photos/${photoId}`);
-  }
-  
-  async deletePhoto(photoId: string) {
-    return this.api.delete(`/photos/${photoId}`);
-  }
-  
-  async updatePhoto(photoId: string, updates: any) {
-    return this.api.put(`/photos/${photoId}`, updates);
-  }
-  
-  async getMapPins() {
-    return this.api.get('/photos/map/pins');
-  }
-  
-  async getTimeline(year?: number) {
-    return this.api.get('/photos/timeline', { params: { year } });
-  }
-  
-  async searchPhotos(query: string, filters?: any) {
-    return this.api.get('/photos/search/photos', { 
-      params: { q: query, ...filters } 
-    });
-  }
-  
-  // Trip endpoints
-  async createTrip(tripData: any) {
-    return this.api.post('/trips', tripData);
-  }
-  
-  async getTrips() {
-    return this.api.get('/trips');
-  }
-  
-  async autoClusterPhotos(config?: any) {
-    return this.api.post('/trips/auto-cluster', config);
-  }
-}
+);
 
-export const apiService = new ApiService();
-export default apiService;
+// --- Photo Endpoints ---
+
+// Upload *multiple* photos (using FormData)
+export const uploadPhotos = async (files: File[]) => {
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append('photos', file); // 'photos' must match backend upload.array('photos')
+  });
+
+  const { data } = await api.post('/photos/upload-multiple', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return data; // { success: true, uploaded: [...], errors: [...] }
+};
+
+// Get all photos with filters
+export const getPhotos = async (filters: { [key: string]: any } = {}) => {
+  const { data } = await api.get<{
+    success: boolean,
+    photos: PhotoMetadata[],
+    total: number
+  }>('/photos', { params: filters });
+  return data;
+};
+
+// Get photos for the map
+export const getMapPins = async () => {
+  const { data } = await api.get<{
+    success: boolean,
+    photos: PhotoMetadata[],
+    total: number
+  }>('/photos/map-pins');
+  return data;
+};
+
+// Get photos for the timeline
+export const getTimeline = async () => {
+  const { data } = await api.get<{
+    success: boolean,
+    timeline: { date: string, photos: PhotoMetadata[] }[]
+  }>('/photos/timeline');
+  return data;
+};
+
+// Update a photo's details
+export const updatePhoto = async (photoId: string, updates: Partial<PhotoMetadata>) => {
+  const { data } = await api.put(`/photos/${photoId}`, updates);
+  return data;
+};
+
+// Delete a photo
+export const deletePhoto = async (photoId: string) => {
+  const { data } = await api.delete(`/photos/${photoId}`);
+  return data;
+};
+
+
+// --- Trip Endpoints ---
+
+export const getUserTrips = async () => {
+  const { data } = await api.get<{
+    success: boolean,
+    trips: Trip[]
+  }>('/trips');
+  return data;
+};
+
+// ... you can add the rest of the trip API calls here (create, update, delete)
+// Example:
+export const createTrip = async (tripData: { name: string, photoIds: string[], startDate: string, endDate: string }) => {
+  const { data } = await api.post('/trips', tripData);
+  return data;
+}
