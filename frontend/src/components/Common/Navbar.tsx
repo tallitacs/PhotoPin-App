@@ -27,6 +27,10 @@ export const Navbar: React.FC = () => {
           <Button component={RouterLink} to="/upload" color="inherit">
             Upload
           </Button>
+          {/* NEW: Import Button */}
+          <Button component={RouterLink} to="/import" color="inherit">
+            Import
+          </Button>
         </Box>
         
         <Box sx={{ flexGrow: 1 }} />

@@ -11,6 +11,10 @@ import { PhotoGallery } from './components/Photos/PhotoGallery';
 import { MapView } from './components/Map/MapView';
 import { TimelineView } from './components/Timeline/TimelineView';
 import { PhotoUpload } from './components/Photos/PhotoUpload';
+// NEW: Import Google Photos components
+import { GooglePhotosImport } from './components/Import/GooglePhotosImport';
+import { GoogleCallback } from './components/Import/GoogleCallback';
+
 
 function App() {
   const { user, loading } = useAuth();
@@ -70,6 +74,24 @@ function App() {
             element={
               <ProtectedRoute>
                 <MapView />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* NEW: Google Photos Import Routes */}
+          <Route 
+            path="/import" 
+            element={
+              <ProtectedRoute>
+                <GooglePhotosImport />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/auth/google/callback" 
+            element={
+              <ProtectedRoute>
+                <GoogleCallback />
               </ProtectedRoute>
             } 
           />

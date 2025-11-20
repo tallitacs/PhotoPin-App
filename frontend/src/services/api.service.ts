@@ -95,9 +95,24 @@ export const getUserTrips = async () => {
   return data;
 };
 
-// ... you can add the rest of the trip API calls here (create, update, delete)
-// Example:
 export const createTrip = async (tripData: { name: string, photoIds: string[], startDate: string, endDate: string }) => {
   const { data } = await api.post('/trips', tripData);
   return data;
 }
+
+// --- NEW: Google Photos Endpoints ---
+
+export const getGoogleAuthUrl = async () => {
+  const { data } = await api.get('/google-photos/auth-url');
+  return data; // { success: true, authUrl: "..." }
+};
+
+export const sendGoogleAuthCode = async (code: string) => {
+  const { data } = await api.post('/google-photos/callback', { code });
+  return data; // { success: true, tokens: { ... } }
+};
+
+export const importGooglePhotos = async (accessToken: string, limit: number = 25) => {
+  const { data } = await api.post('/google-photos/import', { accessToken, limit });
+  return data; // { success: true, imported: [...], errors: [...] }
+};
