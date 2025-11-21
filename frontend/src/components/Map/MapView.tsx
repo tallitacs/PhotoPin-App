@@ -42,7 +42,7 @@ export const MapView: React.FC = () => {
           // Filter photos with GPS coordinates
           const photosWithLocation = data.photos.filter(
             (p: Photo) => p.metadata?.gps?.latitude && p.metadata?.gps?.longitude
-          );
+          ) as Photo[];
           setPhotos(photosWithLocation);
           setFilteredPhotos(photosWithLocation);
 
@@ -72,25 +72,25 @@ export const MapView: React.FC = () => {
       return;
     }
 
-      // Build searchable text from filename, tags, and camera info
-      const lowerSearch = searchTerm.toLowerCase();
-      const filtered = photos.filter((photo) => {
-        const searchableText = [
-          photo.fileName,
-          ...photo.tags,
-          photo.metadata?.cameraMake || '',
-          photo.metadata?.cameraModel || '',
-        ].join(' ').toLowerCase();
+    // Build searchable text from filename, tags, and camera info
+    const lowerSearch = searchTerm.toLowerCase();
+    const filtered = photos.filter((photo) => {
+      const searchableText = [
+        photo.fileName,
+        ...photo.tags,
+        photo.metadata?.cameraMake || '',
+        photo.metadata?.cameraModel || '',
+      ].join(' ').toLowerCase();
 
-        // Check if search term matches any part of searchable text
-        return searchableText.includes(lowerSearch);
-      });
+      // Check if search term matches any part of searchable text
+      return searchableText.includes(lowerSearch);
+    });
 
-      // Update filtered photos
-      setFilteredPhotos(filtered);
+    // Update filtered photos
+    setFilteredPhotos(filtered);
 
-      // Auto-center map on first search result
-      if (filtered.length > 0) {
+    // Auto-center map on first search result
+    if (filtered.length > 0) {
       const firstResult = filtered[0];
       setMapCenter({
         lat: firstResult.metadata.gps!.latitude,
@@ -149,7 +149,7 @@ export const MapView: React.FC = () => {
           </Box>
         )}
       </Box>
-      
+
       {/* Google Maps container */}
       <Box sx={{ flexGrow: 1, position: 'relative' }}>
         <GoogleMap

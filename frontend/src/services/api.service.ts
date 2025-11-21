@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { auth } from '../config/firebase';
-import { PhotoMetadata } from '../types/photo.types';
+import { Photo, PhotoMetadata } from '../types/photo.types';
 import { Trip } from '../types/trip.types';
 
 // Create axios instance with base API URL
@@ -60,7 +60,7 @@ export const getPhotos = async (filters: { [key: string]: any } = {}) => {
 export const getMapPins = async () => {
   const { data } = await api.get<{
     success: boolean,
-    photos: PhotoMetadata[],
+    photos: Photo[],
     total: number
   }>('/photos/map-pins');
   return data;
