@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { tripService } from '../services/TripService';
-// Import from the correct @types directory
+// Import from @types directory
 import { AuthenticatedRequest } from '../@types/express';
 
 export class TripController {

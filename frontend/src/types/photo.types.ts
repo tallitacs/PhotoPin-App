@@ -1,4 +1,4 @@
-// frontend/src/types/photo.types.ts
+// Photo types
 export interface PhotoLocation {
   latitude: number;
   longitude: number;
@@ -14,50 +14,49 @@ export interface PhotoGPS {
   altitude?: number;
 }
 
-// Photo metadata structure (matches backend PhotoMetadata)
+// Photo metadata structure
 export interface PhotoMetadata {
   width: number;
   height: number;
   size: number;
   format: string;
-  takenAt?: string;      // ISO string - when photo was taken (from EXIF)
-  gps?: PhotoGPS;        // GPS coordinates from EXIF
+  takenAt?: string;      // When photo was taken
+  gps?: PhotoGPS;        // GPS coordinates
   cameraMake?: string;   // Camera manufacturer
   cameraModel?: string;  // Camera model
   iso?: number;          // ISO setting
-  aperture?: string;     // Aperture (e.g., "f/2.8")
-  shutterSpeed?: string; // Shutter speed (e.g., "1/500")
-  focalLength?: string;  // Focal length (e.g., "50mm")
+  aperture?: string;     // Aperture
+  shutterSpeed?: string; // Shutter speed
+  focalLength?: string;  // Focal length
 }
 
-// Main photo interface - matches what backend returns
+// Main photo interface
 export interface Photo {
   id: string;
   userId: string;
-  fileName: string;  
+  fileName: string;
   storagePath: string;
   url: string;
   thumbnailUrl?: string;
-  
-  // Nested metadata object (matches backend structure)
+
+  // Metadata object
   metadata: PhotoMetadata;
-  
-  // User-editable fields
+
+  // User-editable
   tags: string[];
   tripId?: string;
-  
-  // Reverse geocoded location (if available)
+
+  // Reverse geocoded location
   location?: PhotoLocation;
-  
+
   // Timestamps
-  uploadedAt: string;    // ISO string - when uploaded to our system
-  updatedAt: string;     // ISO string - when last modified
+  uploadedAt: string;    // When uploaded
+  updatedAt: string;     // When last modified
 }
 
-// Helper type for backward compatibility with components
-// that might expect flat structure
+// Helper type for backward compatibility
 export interface PhotoFlat extends Omit<Photo, 'metadata'> {
-  // Flatten metadata properties
+  // Flattened metadata
   width: number;
   height: number;
   size: number;
@@ -72,7 +71,7 @@ export interface PhotoFlat extends Omit<Photo, 'metadata'> {
   focalLength?: string;
 }
 
-// Utility function to flatten photo for display (if needed)
+// Flatten photo for display
 export const flattenPhoto = (photo: Photo): PhotoFlat => {
   return {
     ...photo,
@@ -91,7 +90,7 @@ export const flattenPhoto = (photo: Photo): PhotoFlat => {
   };
 };
 
-// For uploading photos
+// Photo upload data
 export interface PhotoUploadData {
   file: File;
   title?: string;
@@ -100,14 +99,14 @@ export interface PhotoUploadData {
   tripId?: string;
 }
 
-// Response from backend when uploading
+// Photo upload response
 export interface PhotoUploadResponse {
   success: boolean;
   photo?: Photo;
   error?: string;
 }
 
-// Response from backend when uploading multiple photos
+// Multiple photo upload response
 export interface MultiplePhotoUploadResponse {
   success: boolean;
   message?: string;
@@ -115,14 +114,14 @@ export interface MultiplePhotoUploadResponse {
   errors: Array<{ filename: string; error: string }>;
 }
 
-// For updating photo details
+// Photo update data
 export interface PhotoUpdateData {
   tags?: string[];
   tripId?: string;
   metadata?: Partial<PhotoMetadata>;
 }
 
-// Query parameters for fetching photos
+// Photo query parameters
 export interface PhotoQueryParams {
   userId?: string;
   tripId?: string;
@@ -139,7 +138,7 @@ export interface PhotoQueryParams {
   sortOrder?: 'asc' | 'desc';
 }
 
-// Response from backend when fetching photos
+// Photos response
 export interface PhotosResponse {
   success: boolean;
   photos: Photo[];
@@ -147,14 +146,14 @@ export interface PhotosResponse {
   error?: string;
 }
 
-// Response from backend for single photo
+// Single photo response
 export interface PhotoResponse {
   success: boolean;
   photo?: Photo;
   error?: string;
 }
 
-// Timeline grouped photos
+// Timeline group
 export interface TimelineGroup {
   date: string;
   photos: Photo[];

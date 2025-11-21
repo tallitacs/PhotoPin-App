@@ -11,9 +11,7 @@ export class MapService {
     return MapService.instance;
   }
 
-  /**
-   * Generate map markers from photos
-   */
+  // Generate map markers from photos
   generatePhotoMarkers(photos: Photo[]): any[] {
     return photos
       .filter(photo => photo.metadata.gps)
@@ -29,9 +27,7 @@ export class MapService {
       }));
   }
 
-  /**
-   * Generate trip boundaries for map
-   */
+  // Generate trip boundaries for map
   generateTripBoundaries(trips: Trip[]): any[] {
     return trips
       .filter(trip => trip.location)
@@ -47,9 +43,7 @@ export class MapService {
       }));
   }
 
-  /**
-   * Cluster nearby markers
-   */
+  // Cluster nearby markers
   clusterMarkers(markers: any[], clusterRadius: number = 50): any[] {
     const clusters: any[] = [];
     const processed = new Set();
@@ -57,7 +51,7 @@ export class MapService {
     markers.forEach(marker => {
       if (processed.has(marker.id)) return;
 
-      const nearby = markers.filter(other => 
+      const nearby = markers.filter(other =>
         !processed.has(other.id) &&
         this.calculateDistance(marker.position, other.position) <= clusterRadius
       );
@@ -90,19 +84,19 @@ export class MapService {
   }
 
   private calculateDistance(pos1: any, pos2: any): number {
-    const R = 6371; // Earth's radius in km
+    const R = 6371; // Earth radius in km
     const dLat = this.deg2rad(pos2.lat - pos1.lat);
     const dLon = this.deg2rad(pos2.lng - pos1.lng);
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(this.deg2rad(pos1.lat)) * Math.cos(this.deg2rad(pos2.lat)) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2); 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.deg2rad(pos1.lat)) * Math.cos(this.deg2rad(pos2.lat)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
 
   private deg2rad(deg: number): number {
-    return deg * (Math.PI/180);
+    return deg * (Math.PI / 180);
   }
 }
 

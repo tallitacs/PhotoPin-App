@@ -1,9 +1,10 @@
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-// Load environment variables
+// Load environment variables from .env file
 dotenv.config();
 
+// Define Firebase service account credentials structure
 interface FirebaseCredentials {
   type: string;
   project_id: string;
@@ -18,6 +19,7 @@ interface FirebaseCredentials {
   universe_domain: string;
 }
 
+// Define application environment configuration structure
 interface Environment {
   nodeEnv: string;
   port: number;
@@ -46,7 +48,7 @@ interface Environment {
   };
 }
 
-// Load Firebase credentials
+// Load Firebase credentials from file or environment variables
 let firebaseCredentials: FirebaseCredentials;
 
 try {
@@ -70,31 +72,37 @@ try {
   };
 }
 
+// Build environment configuration object
 export const environment: Environment = {
+  // Application environment settings
   nodeEnv: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '5000', 10),
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-  
+
+  // Firebase configuration
   firebase: {
     credentials: firebaseCredentials,
     projectId: firebaseCredentials.project_id,
     databaseURL: `https://${firebaseCredentials.project_id}.firebaseio.com`,
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${firebaseCredentials.project_id}.appspot.com`
   },
-  
+
+  // Google APIs configuration
   google: {
     mapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
     photosClientId: process.env.GOOGLE_PHOTOS_CLIENT_ID || '',
     photosClientSecret: process.env.GOOGLE_PHOTOS_CLIENT_SECRET || '',
     photosRedirectUri: process.env.GOOGLE_PHOTOS_REDIRECT_URI || 'http://localhost:3000/auth/google/callback'
   },
-  
+
+  // Security settings
   security: {
     jwtSecret: process.env.JWT_SECRET || 'default-secret-change-in-production',
     rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
     rateLimitMaxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10)
   },
-  
+
+  // File upload settings
   storage: {
     maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '52428800', 10), // 50MB
     maxFilesPerUpload: parseInt(process.env.MAX_FILES_PER_UPLOAD || '10', 10),

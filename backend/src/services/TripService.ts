@@ -8,18 +8,16 @@ export class TripService {
   private tripsCollection = db.collection('trips');
   private photosCollection = db.collection('photos');
 
-  /**
-   * Create a new trip
-   */
+  // Create a new trip
   async createTrip(userId: string, tripData: TripInput): Promise<TripResult> {
     try {
       const tripId = uuidv4();
-      
+
       // Validate and fetch photos
       const photoRefs = await Promise.all(
         tripData.photoIds.map(id => this.photosCollection.doc(id).get())
       );
-      
+
       const validPhotos = photoRefs
         .filter(ref => ref.exists && ref.data()?.userId === userId)
         .map(ref => ref.data() as Photo);
@@ -31,14 +29,14 @@ export class TripService {
       // Calculate trip location from photo GPS data
       const photosWithLocation = validPhotos.filter(p => p.metadata.gps);
       let location: TripLocation | undefined;
-      
+
       if (photosWithLocation.length > 0) {
         location = this.calculateTripLocation(photosWithLocation);
       }
 
       // Get cover photo (first photo or specified)
       const coverPhoto = validPhotos[0];
-      
+
       const trip: Trip = {
         id: tripId,
         userId,
@@ -74,9 +72,7 @@ export class TripService {
     }
   }
 
-  /**
-   * Get all trips for a user
-   */
+  // Get all trips for a user
   async getUserTrips(userId: string): Promise<TripsResult> {
     try {
       const snapshot = await this.tripsCollection
@@ -96,9 +92,7 @@ export class TripService {
     }
   }
 
-  /**
-   * Get single trip by ID
-   */
+  // Get single trip by ID
   async getTripById(tripId: string, userId: string): Promise<TripResult> {
     try {
       const doc = await this.tripsCollection.doc(tripId).get();
@@ -120,9 +114,7 @@ export class TripService {
     }
   }
 
-  /**
-   * Update trip
-   */
+  // Update trip
   async updateTrip(tripId: string, userId: string, updates: Partial<Trip>): Promise<TripResult> {
     try {
       const doc = await this.tripsCollection.doc(tripId).get();
@@ -157,9 +149,7 @@ export class TripService {
     }
   }
 
-  /**
-   * Delete trip
-   */
+  // Delete trip
   async deleteTrip(tripId: string, userId: string): Promise<{ success: boolean; error?: string }> {
     try {
       const doc = await this.tripsCollection.doc(tripId).get();
@@ -195,9 +185,7 @@ export class TripService {
     }
   }
 
-  /**
-   * Add photos to trip
-   */
+  // Add photos to trip
   async addPhotosToTrip(tripId: string, userId: string, photoIds: string[]): Promise<TripResult> {
     try {
       const doc = await this.tripsCollection.doc(tripId).get();
@@ -216,14 +204,14 @@ export class TripService {
       const photoRefs = await Promise.all(
         photoIds.map(id => this.photosCollection.doc(id).get())
       );
-      
+
       const validPhotoIds = photoRefs
         .filter(ref => ref.exists && ref.data()?.userId === userId)
         .map(ref => ref.id);
 
       // Update trip with new photos
       const updatedPhotoIds = [...new Set([...trip.photoIds, ...validPhotoIds])];
-      
+
       await this.tripsCollection.doc(tripId).update({
         photoIds: updatedPhotoIds,
         updatedAt: new Date().toISOString()
@@ -248,15 +236,13 @@ export class TripService {
     }
   }
 
-  /**
-   * Auto-cluster photos into trips based on location and time proximity
-   */
+  // Auto-cluster photos into trips based on location and time proximity
   async autoClusterPhotos(
-    userId: string, 
+    userId: string,
     options: ClusterOptions = { maxDistance: 50, maxTimeGap: 24, minPhotos: 3 }
   ): Promise<TripsResult> {
     try {
-      // Get all photos with location that aren't in trips
+      // Get photos with location not in trips
       const snapshot = await this.photosCollection
         .where('userId', '==', userId)
         .where('tags', 'array-contains', 'has-location')
@@ -275,7 +261,7 @@ export class TripService {
         return { trips: [] };
       }
 
-      // Cluster algorithm
+      // Cluster photos
       const clusters: Photo[][] = [];
       let currentCluster: Photo[] = [photos[0]];
 
@@ -290,8 +276,8 @@ export class TripService {
           currPhoto.metadata.gps!.longitude
         );
 
-        const timeGap = (new Date(currPhoto.metadata.takenAt!).getTime() - 
-                        new Date(prevPhoto.metadata.takenAt!).getTime()) / (1000 * 60 * 60);
+        const timeGap = (new Date(currPhoto.metadata.takenAt!).getTime() -
+          new Date(prevPhoto.metadata.takenAt!).getTime()) / (1000 * 60 * 60);
 
         if (distance <= options.maxDistance && timeGap <= options.maxTimeGap) {
           currentCluster.push(currPhoto);
@@ -303,21 +289,21 @@ export class TripService {
         }
       }
 
-      // Add last cluster
+      // Add final cluster
       if (currentCluster.length >= options.minPhotos) {
         clusters.push(currentCluster);
       }
 
-      // Create trips from clusters
+      // Create trips
       const createdTrips: Trip[] = [];
-      
+
       for (const cluster of clusters) {
         const startDate = cluster[0].metadata.takenAt!;
         const endDate = cluster[cluster.length - 1].metadata.takenAt!;
-        
+
         const startDateObj = new Date(startDate);
         const tripName = `Trip to ${this.getApproximateLocation(cluster[0])} - ${startDateObj.toLocaleDateString()}`;
-        
+
         const result = await this.createTrip(userId, {
           name: tripName,
           description: `Auto-generated trip with ${cluster.length} photos`,
@@ -338,9 +324,7 @@ export class TripService {
     }
   }
 
-  /**
-   * Calculate trip location from photos
-   */
+  // Calculate trip location from photos
   private calculateTripLocation(photos: Photo[]): TripLocation {
     const lats = photos.map(p => p.metadata.gps!.latitude);
     const lngs = photos.map(p => p.metadata.gps!.longitude);
@@ -360,12 +344,9 @@ export class TripService {
     };
   }
 
-  /**
-   * Get approximate location name (placeholder - would use reverse geocoding in production)
-   */
+  // Get approximate location name
   private getApproximateLocation(photo: Photo): string {
-    // In production, use Google Geocoding API here
-    // For now, return coordinates
+    // Return coordinates (use reverse geocoding in production)
     if (photo.metadata.gps) {
       return `${photo.metadata.gps.latitude.toFixed(2)}, ${photo.metadata.gps.longitude.toFixed(2)}`;
     }

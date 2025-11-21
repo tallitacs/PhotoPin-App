@@ -3,13 +3,13 @@ import { auth } from '../config/firebaseAdmin';
 import { AuthenticatedRequest } from '../@types/express';
 
 export class AuthController {
-  /**
-   * Register a new user
-   */
+  // Register a new user account
   static async register(req: AuthenticatedRequest, res: Response) {
     try {
+      // Extract registration data from request body
       const { email, password, displayName } = req.body;
 
+      // Validate required fields
       if (!email || !password) {
         return res.status(400).json({
           success: false,
@@ -17,16 +17,17 @@ export class AuthController {
         });
       }
 
-      // Create user in Firebase Auth
+      // Create user account in Firebase Auth
       const userRecord = await auth.createUser({
         email,
         password,
         displayName: displayName || email.split('@')[0]
       });
 
-      // Create custom token
+      // Generate custom token for client-side authentication
       const customToken = await auth.createCustomToken(userRecord.uid);
 
+      // Return success response with user data and token
       res.status(201).json({
         success: true,
         message: 'User registered successfully',
@@ -46,11 +47,10 @@ export class AuthController {
     }
   }
 
-  /**
-   * Get current user profile
-   */
+  // Get current authenticated user's profile
   static async getProfile(req: AuthenticatedRequest, res: Response) {
     try {
+      // Verify user is authenticated
       if (!req.user) {
         return res.status(401).json({
           success: false,
@@ -58,8 +58,10 @@ export class AuthController {
         });
       }
 
+      // Fetch user record from Firebase Auth
       const userRecord = await auth.getUser(req.user.uid);
 
+      // Return user profile data
       res.json({
         success: true,
         user: {

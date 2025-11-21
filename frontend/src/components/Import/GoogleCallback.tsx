@@ -23,7 +23,7 @@ export const GoogleCallback: React.FC = () => {
       try {
         const data = await api.sendGoogleAuthCode(code);
         if (data.success && data.tokens.access_token) {
-          // Save the access token and navigate back to the import page
+          // Save token and navigate to import page
           localStorage.setItem(GOOGLE_ACCESS_TOKEN_KEY, data.tokens.access_token);
           navigate('/import');
         } else {

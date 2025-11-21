@@ -52,11 +52,11 @@ root.render(
   </React.StrictMode>
 );
 
-// Register service worker with update notification
+// Register service worker
 serviceWorkerRegistration.register({
   onUpdate: (registration) => {
     if (registration && registration.waiting) {
-      // Show update available notification
+      // Show update notification
       if (window.confirm('New version available! Reload to update?')) {
         registration.waiting.postMessage({ type: 'SKIP_WAITING' });
         window.location.reload();

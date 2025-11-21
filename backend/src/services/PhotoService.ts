@@ -11,32 +11,31 @@ import {
 } from '../@types/Photo';
 
 export class PhotoService {
+  // Reference to Firestore photos collection
   private photosCollection = db.collection('photos');
 
-  /**
-   * Upload photo with thumbnail generation
-   */
+  // Upload photo with thumbnail generation and metadata extraction
   async uploadPhoto(userId: string, file: Express.Multer.File): Promise<PhotoUploadResult> {
     try {
-      // Validate file
+      // Validate file type
       if (!PhotoMetadataUtil.isValidImageFile(file.mimetype, file.originalname)) {
         return { error: 'Invalid image file type' };
       }
 
-      // Generate unique ID
+      // Generate unique identifiers and storage paths
       const photoId = uuidv4();
       const timestamp = Date.now();
       const fileExtension = file.originalname.split('.').pop();
       const storagePath = `users/${userId}/photos/${timestamp}_${photoId}.${fileExtension}`;
       const thumbnailPath = `users/${userId}/thumbnails/${timestamp}_${photoId}_thumb.jpg`;
 
-      // Extract metadata
+      // Extract EXIF metadata (GPS, camera info, date taken, etc.)
       const metadata = await PhotoMetadataUtil.extractMetadata(file.buffer, file.originalname);
-      
-      // Generate tags
+
+      // Generate automatic tags based on metadata
       const tags = PhotoMetadataUtil.generateTags(metadata, file.originalname);
 
-      // Generate thumbnail
+      // Generate thumbnail for faster loading
       const thumbnailBuffer = await PhotoMetadataUtil.generateThumbnail(file.buffer);
 
       // Upload original photo
@@ -71,10 +70,11 @@ export class PhotoService {
         thumbnailRef.makePublic()
       ]);
 
+      // Generate public URLs for accessing files
       const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
       const thumbnailUrl = `https://storage.googleapis.com/${bucket.name}/${thumbnailPath}`;
 
-      // Create photo document
+      // Create photo document for Firestore
       const photoData: Photo = {
         id: photoId,
         userId,
@@ -88,7 +88,7 @@ export class PhotoService {
         updatedAt: new Date().toISOString()
       };
 
-      // Save to Firestore
+      // Save photo document to Firestore database
       await this.photosCollection.doc(photoId).set(photoData);
 
       return { photo: photoData };
@@ -98,19 +98,18 @@ export class PhotoService {
     }
   }
 
-  /**
-   * Get photos with advanced filtering
-   */
+  // Get user's photos with advanced filtering options
   async getUserPhotos(userId: string, filters: PhotoFilters = {}): Promise<PhotosQueryResult> {
     try {
+      // Start with base query - filter by user ID
       let query: FirebaseFirestore.Query = this.photosCollection.where('userId', '==', userId);
 
-      // Apply date range filters
+      // Apply date range filters (year, month)
       if (filters.year) {
         const startDate = new Date(`${filters.year}-01-01`).toISOString();
         const endDate = new Date(`${filters.year}-12-31T23:59:59.999Z`).toISOString();
         query = query.where('metadata.takenAt', '>=', startDate)
-                     .where('metadata.takenAt', '<=', endDate);
+          .where('metadata.takenAt', '<=', endDate);
       }
 
       if (filters.month && filters.year) {
@@ -119,20 +118,21 @@ export class PhotoService {
         const endYear = filters.month === 12 ? filters.year + 1 : filters.year;
         const endDate = new Date(`${endYear}-${String(endMonth).padStart(2, '0')}-01`).toISOString();
         query = query.where('metadata.takenAt', '>=', startDate)
-                     .where('metadata.takenAt', '<', endDate);
+          .where('metadata.takenAt', '<', endDate);
       }
 
       if (filters.tripId) {
         query = query.where('tripId', '==', filters.tripId);
       }
 
+      // Filter photos with GPS location data
       if (filters.hasLocation) {
         query = query.where('tags', 'array-contains', 'has-location');
       }
 
-      // Order and limit
+      // Sort by date taken (newest first) and apply limit
       query = query.orderBy('metadata.takenAt', 'desc');
-      
+
       if (filters.limit) {
         query = query.limit(filters.limit);
       }
@@ -140,19 +140,20 @@ export class PhotoService {
       const snapshot = await query.get();
       const photos: Photo[] = [];
 
+      // Convert Firestore documents to Photo objects
       snapshot.forEach((doc) => {
         photos.push(doc.data() as Photo);
       });
 
-      // Apply tag filtering (Firestore doesn't support array-contains with multiple values)
+      // Apply client-side tag filtering (Firestore doesn't support multiple array-contains)
       let filteredPhotos = photos;
       if (filters.tags && filters.tags.length > 0) {
-        filteredPhotos = photos.filter(photo => 
+        filteredPhotos = photos.filter(photo =>
           filters.tags!.every(tag => photo.tags.includes(tag))
         );
       }
 
-      // Apply offset for pagination
+      // Apply pagination offset
       if (filters.offset) {
         filteredPhotos = filteredPhotos.slice(filters.offset);
       }
@@ -164,19 +165,20 @@ export class PhotoService {
     }
   }
 
-  /**
-   * Get single photo by ID
-   */
+  // Get single photo by ID with ownership verification
   async getPhotoById(photoId: string, userId: string): Promise<PhotoQueryResult> {
     try {
+      // Fetch photo document from Firestore
       const doc = await this.photosCollection.doc(photoId).get();
 
+      // Check if photo exists
       if (!doc.exists) {
         return { error: 'Photo not found' };
       }
 
       const photo = doc.data() as Photo;
 
+      // Verify user owns this photo
       if (photo.userId !== userId) {
         return { error: 'Access denied' };
       }
@@ -188,11 +190,10 @@ export class PhotoService {
     }
   }
 
-  /**
-   * Update photo metadata
-   */
+  // Update photo metadata with ownership verification
   async updatePhoto(photoId: string, userId: string, updates: Partial<Photo>): Promise<PhotoQueryResult> {
     try {
+      // Fetch photo to verify existence and ownership
       const doc = await this.photosCollection.doc(photoId).get();
 
       if (!doc.exists) {
@@ -201,11 +202,12 @@ export class PhotoService {
 
       const photo = doc.data() as Photo;
 
+      // Verify user owns this photo
       if (photo.userId !== userId) {
         return { error: 'Access denied' };
       }
 
-      // Allowed updates
+      // Build allowed updates object (only specific fields can be updated)
       const allowedUpdates: any = {
         updatedAt: new Date().toISOString()
       };
@@ -219,8 +221,10 @@ export class PhotoService {
         };
       }
 
+      // Update photo document in Firestore
       await this.photosCollection.doc(photoId).update(allowedUpdates);
 
+      // Fetch and return updated photo
       const updatedDoc = await this.photosCollection.doc(photoId).get();
       return { photo: updatedDoc.data() as Photo };
     } catch (error: any) {
@@ -229,11 +233,10 @@ export class PhotoService {
     }
   }
 
-  /**
-   * Delete photo
-   */
+  // Delete photo and associated files with ownership verification
   async deletePhoto(photoId: string, userId: string): Promise<PhotoDeleteResult> {
     try {
+      // Fetch photo to verify existence and ownership
       const doc = await this.photosCollection.doc(photoId).get();
 
       if (!doc.exists) {
@@ -242,13 +245,14 @@ export class PhotoService {
 
       const photo = doc.data() as Photo;
 
+      // Verify user owns this photo
       if (photo.userId !== userId) {
         return { success: false, error: 'Access denied' };
       }
 
-      // Delete from storage
+      // Delete files from Firebase Storage
       const deletePromises = [
-        bucket.file(photo.storagePath).delete().catch(err => 
+        bucket.file(photo.storagePath).delete().catch(err =>
           console.warn('Original file delete failed:', err)
         )
       ];
@@ -258,16 +262,17 @@ export class PhotoService {
         const thumbnailPath = photo.thumbnailUrl.split(`${bucket.name}/`)[1];
         if (thumbnailPath) {
           deletePromises.push(
-            bucket.file(thumbnailPath).delete().catch(err => 
+            bucket.file(thumbnailPath).delete().catch(err =>
               console.warn('Thumbnail delete failed:', err)
             )
           );
         }
       }
 
+      // Wait for all file deletions to complete
       await Promise.all(deletePromises);
 
-      // Delete from Firestore
+      // Delete photo document from Firestore
       await this.photosCollection.doc(photoId).delete();
 
       return { success: true };
@@ -277,11 +282,10 @@ export class PhotoService {
     }
   }
 
-  /**
-   * Get photos with location data
-   */
+  // Get photos that have GPS location data for map display
   async getPhotosWithLocation(userId: string): Promise<PhotosQueryResult> {
     try {
+      // Query photos with location tag, sorted by date
       const query = this.photosCollection
         .where('userId', '==', userId)
         .where('tags', 'array-contains', 'has-location')
@@ -290,6 +294,7 @@ export class PhotoService {
       const snapshot = await query.get();
       const photos: Photo[] = [];
 
+      // Filter to only include photos with actual GPS coordinates
       snapshot.forEach((doc) => {
         const photo = doc.data() as Photo;
         if (photo.metadata.gps) {
@@ -304,11 +309,10 @@ export class PhotoService {
     }
   }
 
-  /**
-   * Search photos
-   */
+  // Search photos by filename, tags, or camera info
   async searchPhotos(userId: string, searchTerm: string): Promise<PhotosQueryResult> {
     try {
+      // Get all user's photos (Firestore doesn't support full-text search)
       const snapshot = await this.photosCollection
         .where('userId', '==', userId)
         .get();
@@ -316,8 +320,10 @@ export class PhotoService {
       const photos: Photo[] = [];
       const lowerSearchTerm = searchTerm.toLowerCase();
 
+      // Filter photos by search term in memory
       snapshot.forEach((doc) => {
         const photo = doc.data() as Photo;
+        // Build searchable text from filename, tags, and camera info
         const searchableText = [
           photo.fileName,
           ...photo.tags,
@@ -325,12 +331,13 @@ export class PhotoService {
           photo.metadata.cameraModel || ''
         ].join(' ').toLowerCase();
 
+        // Check if search term matches
         if (searchableText.includes(lowerSearchTerm)) {
           photos.push(photo);
         }
       });
 
-      // Sort by relevance (exact matches first, then partial)
+      // Sort by relevance (exact filename matches first)
       photos.sort((a, b) => {
         const aExact = a.fileName.toLowerCase() === lowerSearchTerm ? 1 : 0;
         const bExact = b.fileName.toLowerCase() === lowerSearchTerm ? 1 : 0;
@@ -344,25 +351,26 @@ export class PhotoService {
     }
   }
 
-  /**
-   * Get photos grouped by date for timeline view
-   */
+  // Get photos grouped by date for timeline view
   async getPhotoTimeline(userId: string, filters: PhotoFilters = {}): Promise<any> {
     try {
+      // Get user's photos with filters
       const result = await this.getUserPhotos(userId, filters);
-      
+
       if (result.error || !result.photos) {
         return { error: result.error || 'No photos found' };
       }
 
-      // Group by date
+      // Group photos by date (YYYY-MM-DD format)
       const timeline: { [key: string]: Photo[] } = {};
-      
+
       result.photos.forEach(photo => {
-        const date = photo.metadata.takenAt 
+        // Extract date from takenAt timestamp
+        const date = photo.metadata.takenAt
           ? new Date(photo.metadata.takenAt).toISOString().split('T')[0]
           : 'unknown';
-        
+
+        // Initialize date array if needed
         if (!timeline[date]) {
           timeline[date] = [];
         }

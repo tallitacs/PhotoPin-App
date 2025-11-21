@@ -4,14 +4,14 @@ import { useAuth } from './hooks/useAuth';
 import { ProtectedRoute } from './components/Common/ProtectedRoute';
 import { Navbar } from './components/Common/Navbar';
 
-// Page Components
+// Page components
 import { LoginForm } from './components/Auth/LoginForm';
 import { SignupForm } from './components/Auth/SignupForm';
 import { PhotoGallery } from './components/Photos/PhotoGallery';
 import { MapView } from './components/Map/MapView';
 import { TimelineView } from './components/Timeline/TimelineView';
 import { PhotoUpload } from './components/Photos/PhotoUpload';
-// NEW: Import Google Photos components
+// Google Photos components
 import { GooglePhotosImport } from './components/Import/GooglePhotosImport';
 import { GoogleCallback } from './components/Import/GoogleCallback';
 
@@ -20,7 +20,7 @@ function App() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    // Show a global spinner while checking auth state
+    // Show spinner while checking auth
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
         <CircularProgress />
@@ -31,72 +31,72 @@ function App() {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       {user && <Navbar />}
-      <Box 
-        component="main" 
-        sx={{ 
-          flexGrow: 1, 
-          overflow: 'auto', 
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          overflow: 'auto',
           p: user ? 3 : 0 // No padding for login/signup pages
         }}
       >
         <Routes>
-          {/* Public Routes */}
+          {/* Public routes */}
           <Route path="/login" element={user ? <Navigate to="/" /> : <LoginForm />} />
           <Route path="/signup" element={user ? <Navigate to="/" /> : <SignupForm />} />
 
-          {/* Protected Routes */}
-          <Route 
-            path="/" 
+          {/* Protected routes */}
+          <Route
+            path="/"
             element={
               <ProtectedRoute>
                 <PhotoGallery />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/upload" 
+          <Route
+            path="/upload"
             element={
               <ProtectedRoute>
                 <PhotoUpload />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/timeline" 
+          <Route
+            path="/timeline"
             element={
               <ProtectedRoute>
                 <TimelineView />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/map" 
+          <Route
+            path="/map"
             element={
               <ProtectedRoute>
                 <MapView />
               </ProtectedRoute>
-            } 
+            }
           />
-          
-          {/* NEW: Google Photos Import Routes */}
-          <Route 
-            path="/import" 
+
+          {/* Google Photos import routes */}
+          <Route
+            path="/import"
             element={
               <ProtectedRoute>
                 <GooglePhotosImport />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/auth/google/callback" 
+          <Route
+            path="/auth/google/callback"
             element={
               <ProtectedRoute>
                 <GoogleCallback />
               </ProtectedRoute>
-            } 
+            }
           />
-          
-          {/* Redirect any other path */}
+
+          {/* Redirect unknown paths */}
           <Route path="*" element={<Navigate to={user ? "/" : "/login"} />} />
         </Routes>
       </Box>

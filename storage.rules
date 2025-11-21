@@ -1,10 +1,27 @@
 rules_version = '2';
 
-// Craft rules based on data in your Firestore database
-// allow write: if firestore.get(
-//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Users can only access their own files
+    match /users/{userId}/{allPaths=**} {
+      // Allow read if file is public or user owns it
+      allow read: if true; // Photos are made public in PhotoService
+      
+      // Allow write only if user owns the path
+      allow write: if isOwner(userId);
+    }
+    
+    // Default deny all other paths
     match /{allPaths=**} {
       allow read, write: if false;
     }

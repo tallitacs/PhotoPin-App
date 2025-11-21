@@ -1,9 +1,9 @@
 import axios from 'axios';
-import { auth } from '../config/firebase'; // Import client-side auth
+import { auth } from '../config/firebase';
 import { PhotoMetadata } from '../types/photo.types';
 import { Trip } from '../types/trip.types';
 
-// Create an axios instance
+// Create axios instance with base API URL
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL,
   headers: {
@@ -11,7 +11,7 @@ const api = axios.create({
   },
 });
 
-// Interceptor to add the Firebase auth token to every request
+// Request interceptor - automatically add Firebase auth token to all requests
 api.interceptors.request.use(
   async (config) => {
     const user = auth.currentUser;
@@ -26,13 +26,16 @@ api.interceptors.request.use(
   }
 );
 
-// --- Photo Endpoints ---
+// ==========================================
+// Photo API Endpoints
+// ==========================================
 
-// Upload *multiple* photos (using FormData)
+// Upload multiple photos using FormData
 export const uploadPhotos = async (files: File[]) => {
+  // Build FormData with all files
   const formData = new FormData();
   files.forEach((file) => {
-    formData.append('photos', file); // 'photos' must match backend upload.array('photos')
+    formData.append('photos', file); // Field name must match backend upload.array('photos')
   });
 
   const { data } = await api.post('/photos/upload-multiple', formData, {
@@ -40,10 +43,10 @@ export const uploadPhotos = async (files: File[]) => {
       'Content-Type': 'multipart/form-data',
     },
   });
-  return data; // { success: true, uploaded: [...], errors: [...] }
+  return data; // Returns: { success: true, uploaded: [...], errors: [...] }
 };
 
-// Get all photos with filters
+// Get user's photos with optional filters (year, tags, tripId, etc.)
 export const getPhotos = async (filters: { [key: string]: any } = {}) => {
   const { data } = await api.get<{
     success: boolean,
@@ -53,7 +56,7 @@ export const getPhotos = async (filters: { [key: string]: any } = {}) => {
   return data;
 };
 
-// Get photos for the map
+// Get photos with GPS coordinates for map display
 export const getMapPins = async () => {
   const { data } = await api.get<{
     success: boolean,
@@ -63,7 +66,7 @@ export const getMapPins = async () => {
   return data;
 };
 
-// Get photos for the timeline
+// Get photos grouped by date for timeline view
 export const getTimeline = async () => {
   const { data } = await api.get<{
     success: boolean,
@@ -72,7 +75,7 @@ export const getTimeline = async () => {
   return data;
 };
 
-// Update a photo's details
+// Update photo metadata (tags, tripId, etc.)
 export const updatePhoto = async (photoId: string, updates: Partial<PhotoMetadata>) => {
   const { data } = await api.put(`/photos/${photoId}`, updates);
   return data;
@@ -84,9 +87,11 @@ export const deletePhoto = async (photoId: string) => {
   return data;
 };
 
+// ==========================================
+// Trip API Endpoints
+// ==========================================
 
-// --- Trip Endpoints ---
-
+// Get all trips for current user
 export const getUserTrips = async () => {
   const { data } = await api.get<{
     success: boolean,
@@ -100,18 +105,23 @@ export const createTrip = async (tripData: { name: string, photoIds: string[], s
   return data;
 }
 
-// --- NEW: Google Photos Endpoints ---
+// ==========================================
+// Google Photos API Endpoints
+// ==========================================
 
+// Get OAuth2 authorization URL for Google Photos
 export const getGoogleAuthUrl = async () => {
   const { data } = await api.get('/google-photos/auth-url');
-  return data; // { success: true, authUrl: "..." }
+  return data; // Returns: { success: true, authUrl: "..." }
 };
 
+// Exchange authorization code for access tokens
 export const sendGoogleAuthCode = async (code: string) => {
   const { data } = await api.post('/google-photos/callback', { code });
-  return data; // { success: true, tokens: { ... } }
+  return data; // Returns: { success: true, tokens: { ... } }
 };
 
+// Import photos from Google Photos library
 export const importGooglePhotos = async (accessToken: string, limit: number = 25) => {
   const { data } = await api.post('/google-photos/import', { accessToken, limit });
   return data; // { success: true, imported: [...], errors: [...] }

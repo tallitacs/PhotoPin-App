@@ -12,7 +12,7 @@ export const GooglePhotosImport: React.FC = () => {
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if we have a token in localStorage
+    // Check for token in localStorage
     const token = localStorage.getItem(GOOGLE_ACCESS_TOKEN_KEY);
     if (token) {
       setAccessToken(token);
@@ -25,7 +25,7 @@ export const GooglePhotosImport: React.FC = () => {
     try {
       const data = await api.getGoogleAuthUrl();
       if (data.success) {
-        // Redirect to Google's auth page
+        // Redirect to Google auth page
         window.location.href = data.authUrl;
       } else {
         setError('Could not get Google auth URL.');
@@ -55,7 +55,7 @@ export const GooglePhotosImport: React.FC = () => {
       }
     } catch (err: any) {
       if (err.response?.status === 401) {
-        // Token is likely expired
+        // Token expired
         setError('Your Google session has expired. Please connect again.');
         localStorage.removeItem(GOOGLE_ACCESS_TOKEN_KEY);
         setAccessToken(null);

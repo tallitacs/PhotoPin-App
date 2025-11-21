@@ -1,4 +1,4 @@
-// ✅ frontend/src/components/Common/ErrorBoundary.tsx
+// Error boundary component
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Alert, Box, Button } from '@mui/material';
 
