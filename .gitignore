@@ -38,10 +38,25 @@ frontend/firebase-credentials.json
 src/firebase/config.js
 frontend/src/firebase/config.js
 
+# Additional sensitive files (certificates, keys, etc.)
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+secrets/
+.secrets/
+*.secret
+.env.*.local
+.envrc
+
 # TypeScript/JavaScript
 *.tsbuildinfo
 *.log
-*.lock
+# Note: package-lock.json should be committed, but yarn.lock and pnpm-lock.yaml can be ignored if not used
+yarn.lock
+pnpm-lock.yaml
 
 # Testing
 coverage/
