@@ -28,6 +28,8 @@ export interface PhotoMetadata {
   aperture?: string;     // Aperture
   shutterSpeed?: string; // Shutter speed
   focalLength?: string;  // Focal length
+  description?: string;  // User-added description
+  rotation?: number;     // Rotation angle in degrees (0, 90, 180, 270)
 }
 
 // Main photo interface
@@ -35,6 +37,7 @@ export interface Photo {
   id: string;
   userId: string;
   fileName: string;
+  displayName?: string;  // User-editable display name (shown instead of fileName if set)
   storagePath: string;
   url: string;
   thumbnailUrl?: string;
@@ -45,6 +48,7 @@ export interface Photo {
   // User-editable
   tags: string[];
   tripId?: string;
+  isFavorite?: boolean; // Favorite/starred status
 
   // Reverse geocoded location
   location?: PhotoLocation;

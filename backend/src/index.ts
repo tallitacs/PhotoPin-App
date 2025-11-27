@@ -14,20 +14,34 @@ import { authRoutes } from './routes/authRoutes';
 // Initialize Express application
 const app = express();
 
-// Security middleware - adds security headers
-app.use(helmet());
+// CORS must be configured before other middleware
 app.use(cors({
   origin: environment.corsOrigin,
   credentials: true
 }));
 
+// Security middleware - adds security headers (configured to allow API requests)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false, // Disable CSP for API (can be configured more strictly later)
+}));
+
 // Rate limiting - prevent abuse
+// More lenient in development mode
 const limiter = rateLimit({
   windowMs: environment.security.rateLimitWindowMs,
-  max: environment.security.rateLimitMaxRequests,
+  max: environment.nodeEnv === 'development' 
+    ? environment.security.rateLimitMaxRequests * 10 // 10x more lenient in dev
+    : environment.security.rateLimitMaxRequests,
   message: {
     success: false,
     error: 'Too many requests, please try again later.'
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  // Skip rate limiting for health checks
+  skip: (req) => {
+    return req.path === '/health' || req.path === '/api/health';
   }
 });
 app.use(limiter);
@@ -35,6 +49,23 @@ app.use(limiter);
 // Body parsing middleware - handle JSON and URL-encoded requests
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Root endpoint - API information
+app.get('/', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'PhotoPin API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      auth: '/api/auth',
+      photos: '/api/photos',
+      trips: '/api/trips',
+      googlePhotos: '/api/google-photos'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Health check endpoint - verify API is running
 app.get('/health', (req, res) => {

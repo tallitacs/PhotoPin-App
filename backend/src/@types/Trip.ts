@@ -14,11 +14,12 @@ export interface Trip {
   userId: string;
   name: string;
   description?: string;
-  startDate: string;
-  endDate: string;
+  startDate?: string; // Made optional to handle existing trips
+  endDate?: string; // Made optional to handle existing trips
   photoIds: string[];
   coverPhotoUrl?: string;
-  location?: TripLocation;
+  location?: TripLocation; // GPS coordinates for map
+  locationName?: string; // Display location name (e.g., "Paris, France")
   createdAt: string;
   updatedAt: string;
 }
@@ -27,8 +28,8 @@ export interface TripInput {
   name: string;
   description?: string;
   photoIds: string[];
-  startDate: string;
-  endDate: string;
+  startDate?: string; // Made optional to match Trip interface
+  endDate?: string; // Made optional to match Trip interface
 }
 
 export interface TripResult {

@@ -204,7 +204,7 @@ export const MapView: React.FC = () => {
                   }}
                 />
                 <Box sx={{ fontSize: '0.875rem', fontWeight: 'bold', mb: 0.5 }}>
-                  {selectedPhoto.fileName}
+                  {selectedPhoto.displayName || selectedPhoto.fileName}
                 </Box>
                 {selectedPhoto.metadata.takenAt && (
                   <Box sx={{ fontSize: '0.75rem', color: 'text.secondary', mb: 0.5 }}>

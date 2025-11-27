@@ -23,8 +23,14 @@ export const GoogleCallback: React.FC = () => {
       try {
         const data = await api.sendGoogleAuthCode(code);
         if (data.success && data.tokens.access_token) {
-          // Save token and navigate to import page
+          // Save both access and refresh tokens
           localStorage.setItem(GOOGLE_ACCESS_TOKEN_KEY, data.tokens.access_token);
+          if (data.tokens.refresh_token) {
+            localStorage.setItem('google_refresh_token', data.tokens.refresh_token);
+          }
+          if (data.tokens.expiry_date) {
+            localStorage.setItem('google_token_expiry', data.tokens.expiry_date.toString());
+          }
           navigate('/import');
         } else {
           setError('Failed to exchange code for tokens.');

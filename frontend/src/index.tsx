@@ -2,36 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { ThemeProvider } from './hooks/useTheme';
 import { AuthProvider } from './hooks/useAuth';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
-
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-    background: {
-      default: '#f4f6f8',
-      paper: '#ffffff',
-    },
-  },
-  typography: {
-    fontFamily: [
-      '-apple-system',
-      'BlinkMacSystemFont',
-      '"Segoe UI"',
-      'Roboto',
-      '"Helvetica Neue"',
-      'Arial',
-      'sans-serif',
-    ].join(','),
-  },
-});
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -40,8 +14,7 @@ const root = ReactDOM.createRoot(
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
+      <ThemeProvider>
         <BrowserRouter>
           <AuthProvider>
             <App />

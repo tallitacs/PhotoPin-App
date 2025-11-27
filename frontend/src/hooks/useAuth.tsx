@@ -53,9 +53,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // NOTE: You might want to call your backend '/api/auth/register' endpoint
       // here to create a corresponding user profile in your database (Firestore)
       return userCredential.user;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Signup error:", error);
-      return null;
+      // Re-throw the error so the calling component can handle it
+      throw error;
     }
   };
 
@@ -63,9 +64,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
      try {
       const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, pass);
       return userCredential.user;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
-      return null;
+      // Re-throw the error so the calling component can handle it
+      throw error;
     }
   };
 

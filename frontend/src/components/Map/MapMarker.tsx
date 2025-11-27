@@ -1,23 +1,24 @@
 import React from 'react';
 import { Marker, InfoWindow } from '@react-google-maps/api';
 import { Typography, Box } from '@mui/material';
-import { PhotoMetadata } from '../../types/photo.types';
+import { Photo } from '../../types/photo.types';
 
 interface MapMarkerProps {
-  photo: PhotoMetadata;
-  onClick?: (photo: PhotoMetadata) => void;
+  photo: Photo;
+  onClick?: (photo: Photo) => void;
 }
 
 export const MapMarker: React.FC<MapMarkerProps> = ({ photo, onClick }) => {
   const [showInfo, setShowInfo] = React.useState(false);
 
-  if (!photo.location) return null;
+  // Check if photo has GPS coordinates
+  if (!photo.metadata?.gps) return null;
 
   return (
     <Marker
       position={{
-        lat: photo.location.latitude,
-        lng: photo.location.longitude
+        lat: photo.metadata.gps.latitude,
+        lng: photo.metadata.gps.longitude
       }}
       onClick={() => setShowInfo(true)}
     >
@@ -26,13 +27,13 @@ export const MapMarker: React.FC<MapMarkerProps> = ({ photo, onClick }) => {
           <Box sx={{ maxWidth: 200 }}>
             <img 
               src={photo.thumbnailUrl || photo.url} 
-              alt={photo.title || photo.filename}
+              alt={photo.fileName}
               style={{ width: '100%', height: 'auto', marginBottom: 8 }}
             />
             <Typography variant="subtitle2">
-              {photo.title || photo.filename}
+              {photo.displayName || photo.fileName}
             </Typography>
-            {photo.location.city && (
+            {photo.location?.city && (
               <Typography variant="caption" color="text.secondary">
                 {photo.location.city}
               </Typography>

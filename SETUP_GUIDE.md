@@ -168,7 +168,17 @@ firebase deploy --only firestore:rules
 
 **Storage Rules** (`storage.rules`):
 ```bash
-firebase deploy --only storage:rules
+firebase deploy --only storage
+```
+
+**Note**: Make sure your `firebase.json` includes the storage bucket configuration:
+```json
+"storage": [
+  {
+    "bucket": "your-project-id.appspot.com",
+    "rules": "storage.rules"
+  }
+]
 ```
 
 ### 6. **Get Firebase Admin SDK Credentials**
@@ -182,6 +192,21 @@ firebase deploy --only storage:rules
 2. Scroll to "Your apps"
 3. Click Web icon (`</>`) to add web app
 4. Copy the config object for your frontend `.env`
+5. **Important**: Use the `apiKey` from Firebase config (not your Google Maps API key)
+
+### 8. **Enable Identity Toolkit API (Required for Authentication)**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Select your Firebase project (`photopin-d0d05`)
+3. Go to **APIs & Services** > **Library**
+4. Search for "Identity Toolkit API"
+5. Click **Enable**
+6. This API is required for Firebase Authentication to work
+
+**Note**: If you're using the same API key for both Firebase and Google Maps:
+- Go to **APIs & Services** > **Credentials**
+- Click on your API key
+- Under **API restrictions**, make sure "Identity Toolkit API" is included
+- Or set to "Don't restrict key" (less secure, but works for development)
 
 ---
 
@@ -211,13 +236,23 @@ firebase deploy --only storage:rules
    - User support email: your email
    - Developer contact: your email
    - Add scopes: `https://www.googleapis.com/auth/photoslibrary.readonly`
+   - **Important**: If app is in "Testing" mode, add your email as a test user
 6. Create OAuth 2.0 Client ID:
    - Application type: Web application
    - Name: "PhotoPin Web Client"
-   - Authorized redirect URIs:
+   - Authorized redirect URIs (must match EXACTLY):
      - `http://localhost:3000/auth/google/callback` (development)
+     - **No trailing slash!**
+     - **Must be `http://` not `https://` for localhost**
      - `https://your-domain.com/auth/google/callback` (production)
 7. Copy Client ID and Client Secret to backend `.env`
+
+**Troubleshooting "Access blocked" error:**
+- Verify redirect URI matches exactly (no trailing slash, correct protocol)
+- If app is in Testing mode, ensure your email is added as a test user
+- Wait a few minutes after making changes for them to propagate
+- Clear browser cache/cookies for Google
+- Check that Photos Library API is enabled
 
 **Note**: Google Photos API requires verification for production use, but works fine for development/testing.
 
@@ -258,6 +293,7 @@ Backend should run on `http://localhost:5000`
 cd frontend
 
 # Install dependencies
+
 npm install
 
 # Create .env file (see Environment Variables section)
@@ -402,18 +438,74 @@ Frontend should run on `http://localhost:3000`
 - Built-in CI/CD
 - Easy environment variable management
 - Supports both frontend and backend (via serverless functions)
+- Automatic HTTPS
+- Global CDN
 
-#### Deploy Frontend to Vercel
+---
 
-1. **Prepare Frontend**:
+## 📦 Deploying Frontend to Vercel
+
+### Step 1: Prepare Your Repository
+
+1. **Push your code to GitHub** (if not already):
    ```bash
-   cd frontend
-   npm run build
+   git add .
+   git commit -m "Prepare for deployment"
+   git push origin main
    ```
 
-2. **Install Vercel CLI**:
+2. **Ensure `.env` is in `.gitignore`** (never commit secrets!)
+
+### Step 2: Create Vercel Account
+
+1. Go to [vercel.com](https://vercel.com)
+2. Sign up with GitHub (recommended for automatic deployments)
+3. Authorize Vercel to access your repositories
+
+### Step 3: Deploy Frontend via Vercel Dashboard
+
+1. **Import Project**:
+   - Click "Add New..." > "Project"
+   - Select your GitHub repository
+   - Choose the `frontend` folder as the root directory
+
+2. **Configure Project Settings**:
+   - **Framework Preset**: Create React App
+   - **Root Directory**: `frontend`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `build`
+   - **Install Command**: `npm install`
+
+3. **Add Environment Variables**:
+   - Go to Project Settings > Environment Variables
+   - Add each variable from your `frontend/.env`:
+     ```
+     REACT_APP_API_URL=https://your-backend-url.vercel.app/api
+     REACT_APP_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
+     REACT_APP_FIREBASE_API_KEY=your-firebase-api-key
+     REACT_APP_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
+     REACT_APP_FIREBASE_PROJECT_ID=your-project-id
+     REACT_APP_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
+     REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+     REACT_APP_FIREBASE_APP_ID=your-app-id
+     ```
+   - Set for **Production**, **Preview**, and **Development** environments
+
+4. **Deploy**:
+   - Click "Deploy"
+   - Wait for build to complete
+   - Your app will be live at `https://your-project-name.vercel.app`
+
+### Step 4: Deploy Frontend via CLI (Alternative)
+
+1. **Install Vercel CLI**:
    ```bash
    npm install -g vercel
+   ```
+
+2. **Login**:
+   ```bash
+   vercel login
    ```
 
 3. **Deploy**:
@@ -421,24 +513,33 @@ Frontend should run on `http://localhost:3000`
    cd frontend
    vercel
    ```
-   - Follow prompts
-   - Link to existing project or create new
-   - Add environment variables when prompted
+   - Follow prompts:
+     - Set up and deploy? **Yes**
+     - Which scope? (select your account)
+     - Link to existing project? **No** (first time) or **Yes** (updates)
+     - Project name: `photopin-frontend` (or your choice)
+     - Directory: `./` (current directory)
+     - Override settings? **No**
 
-4. **Configure Environment Variables**:
-   - Go to Vercel Dashboard > Your Project > Settings > Environment Variables
-   - Add all variables from `frontend/.env`
-   - Set for Production, Preview, and Development
+4. **Add Environment Variables**:
+   ```bash
+   vercel env add REACT_APP_API_URL
+   vercel env add REACT_APP_GOOGLE_MAPS_API_KEY
+   # ... add all other variables
+   ```
 
-5. **Update CORS in Backend**:
-   - Update `CORS_ORIGIN` in backend `.env` to include Vercel URL
-   - Example: `CORS_ORIGIN=https://your-app.vercel.app,http://localhost:3000`
+5. **Redeploy with environment variables**:
+   ```bash
+   vercel --prod
+   ```
 
-#### Deploy Backend to Vercel
+---
 
-Vercel supports Node.js backends via serverless functions:
+## 🔧 Deploying Backend to Vercel
 
-1. **Create `vercel.json` in backend/**:
+### Step 1: Prepare Backend for Vercel
+
+1. **Create `vercel.json` in `backend/` directory**:
    ```json
    {
      "version": 2,
@@ -453,40 +554,319 @@ Vercel supports Node.js backends via serverless functions:
          "src": "/(.*)",
          "dest": "dist/index.js"
        }
-     ]
+     ],
+     "env": {
+       "NODE_ENV": "production"
+     }
    }
    ```
 
-2. **Update `backend/src/index.ts`** for serverless:
+2. **Update `backend/src/index.ts`** to export the app:
    ```typescript
-   // Export app for Vercel
+   // At the end of the file, add:
    export default app;
    ```
 
-3. **Deploy**:
-   ```bash
-   cd backend
-   vercel
+3. **Ensure build script exists in `backend/package.json`**:
+   ```json
+   {
+     "scripts": {
+       "build": "tsc",
+       "start": "node dist/index.js"
+     }
+   }
    ```
 
-4. **Add Environment Variables** in Vercel Dashboard
+### Step 2: Deploy Backend via Vercel Dashboard
 
-**Alternative**: Use Vercel's monorepo support to deploy both from root:
-```json
-// vercel.json in root
-{
-  "projects": [
-    {
-      "name": "photopin-frontend",
-      "root": "./frontend"
-    },
-    {
-      "name": "photopin-backend",
-      "root": "./backend"
-    }
-  ]
-}
+1. **Create New Project**:
+   - Click "Add New..." > "Project"
+   - Select the same GitHub repository
+   - Choose the `backend` folder as root directory
+
+2. **Configure Project Settings**:
+   - **Framework Preset**: Other
+   - **Root Directory**: `backend`
+   - **Build Command**: `npm install && npm run build`
+   - **Output Directory**: (leave empty)
+   - **Install Command**: `npm install`
+
+3. **Add Environment Variables**:
+   - Add all variables from `backend/.env`:
+     ```
+     NODE_ENV=production
+     PORT=5000
+     CORS_ORIGIN=https://your-frontend-url.vercel.app,http://localhost:3000
+     FIREBASE_PROJECT_ID=your-project-id
+     FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
+     GOOGLE_MAPS_API_KEY=your-google-maps-api-key
+     GOOGLE_PHOTOS_CLIENT_ID=your-google-photos-client-id
+     GOOGLE_PHOTOS_CLIENT_SECRET=your-google-photos-client-secret
+     GOOGLE_PHOTOS_REDIRECT_URI=https://your-frontend-url.vercel.app/auth/google/callback
+     JWT_SECRET=your-jwt-secret
+     RATE_LIMIT_WINDOW_MS=900000
+     RATE_LIMIT_MAX_REQUESTS=1000
+     MAX_FILE_SIZE=52428800
+     MAX_FILES_PER_UPLOAD=10
+     ALLOWED_MIME_TYPES=image/jpeg,image/png,image/gif,image/webp,image/heic
+     ```
+   - **Important**: For Firebase credentials, you'll need to:
+     - Either: Upload `firebase-credentials.json` and reference it
+     - Or: Convert to environment variables (see below)
+
+4. **Handle Firebase Credentials**:
+   
+   **Option A: Use Environment Variables** (Recommended):
+   - Convert `firebase-credentials.json` to environment variables:
+     ```env
+     FIREBASE_CLIENT_EMAIL=your-service-account-email
+     FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+     FIREBASE_PROJECT_ID=your-project-id
+     ```
+   - Update `backend/src/services/FirebaseService.ts` to use env vars:
+     ```typescript
+     const credentials = {
+       client_email: process.env.FIREBASE_CLIENT_EMAIL!,
+       private_key: process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+       project_id: process.env.FIREBASE_PROJECT_ID!
+     };
+     ```
+
+   **Option B: Use Vercel Secrets**:
+   - Upload `firebase-credentials.json` as a secret
+   - Reference it in your code
+
+5. **Deploy**:
+   - Click "Deploy"
+   - Note the deployment URL (e.g., `https://photopin-backend.vercel.app`)
+
+### Step 3: Update Frontend API URL
+
+1. **Update Frontend Environment Variable**:
+   - Go to Frontend project in Vercel
+   - Settings > Environment Variables
+   - Update `REACT_APP_API_URL` to your backend URL:
+     ```
+     REACT_APP_API_URL=https://your-backend-url.vercel.app/api
+     ```
+   - Redeploy frontend
+
+### Step 4: Update Google OAuth Redirect URI
+
+1. **Go to Google Cloud Console**:
+   - APIs & Services > Credentials
+   - Edit your OAuth 2.0 Client ID
+   - Add authorized redirect URI:
+     ```
+     https://your-frontend-url.vercel.app/auth/google/callback
+     ```
+   - Save
+
+### Step 5: Update Google Maps API Key Restrictions
+
+1. **Go to Google Cloud Console**:
+   - APIs & Services > Credentials
+   - Edit your Maps API key
+   - Under "Application restrictions" > "HTTP referrers", add:
+     ```
+     https://your-frontend-url.vercel.app/*
+     https://*.vercel.app/*
+     ```
+   - Save
+
+---
+
+## 📱 Deploying as PWA (Progressive Web App)
+
+### Step 1: Verify PWA Configuration
+
+1. **Check `frontend/public/manifest.json`** exists:
+   ```json
+   {
+     "short_name": "PhotoPin",
+     "name": "PhotoPin - Photo Organizer",
+     "icons": [
+       {
+         "src": "favicon.ico",
+         "sizes": "64x64 32x32 24x24 16x16",
+         "type": "image/x-icon"
+       },
+       {
+         "src": "logo192.png",
+         "type": "image/png",
+         "sizes": "192x192"
+       },
+       {
+         "src": "logo512.png",
+         "type": "image/png",
+         "sizes": "512x512"
+       }
+     ],
+     "start_url": ".",
+     "display": "standalone",
+     "theme_color": "#ff4e00",
+     "background_color": "#121212"
+   }
+   ```
+
+2. **Check Service Worker** (`frontend/src/serviceWorkerRegistration.ts`):
+   - Should be registered in `frontend/src/index.tsx`
+
+### Step 2: Test PWA Locally
+
+1. **Build and serve**:
+   ```bash
+   cd frontend
+   npm run build
+   npx serve -s build
+   ```
+
+2. **Test in browser**:
+   - Open DevTools > Application > Service Workers
+   - Verify service worker is registered
+   - Check "Add to Home Screen" works
+
+### Step 3: Deploy PWA to Vercel
+
+1. **PWA works automatically** on Vercel if:
+   - `manifest.json` is in `public/` folder
+   - Service worker is registered
+   - App is served over HTTPS (Vercel provides this automatically)
+
+2. **Verify after deployment**:
+   - Visit your Vercel URL
+   - Open DevTools > Application
+   - Check:
+     - ✅ Service Worker registered
+     - ✅ Manifest detected
+     - ✅ HTTPS enabled
+   - On mobile, you should see "Add to Home Screen" option
+
+### Step 4: Install PWA
+
+**On Desktop (Chrome/Edge)**:
+1. Visit your deployed site
+2. Click the install icon in address bar
+3. Or: Menu > "Install PhotoPin"
+
+**On Mobile (iOS Safari)**:
+1. Visit your deployed site
+2. Tap Share button
+3. Tap "Add to Home Screen"
+
+**On Mobile (Android Chrome)**:
+1. Visit your deployed site
+2. Tap menu (3 dots)
+3. Tap "Add to Home Screen" or "Install App"
+
+---
+
+## 🔄 Continuous Deployment Setup
+
+### Automatic Deployments from GitHub
+
+1. **Vercel automatically deploys** when you:
+   - Push to `main` branch → Production deployment
+   - Push to other branches → Preview deployment
+   - Open Pull Request → Preview deployment
+
+2. **Customize deployment** in `vercel.json`:
+   ```json
+   {
+     "git": {
+       "deploymentEnabled": {
+         "main": true
+       }
+     },
+     "github": {
+       "enabled": true,
+       "autoAlias": true
+     }
+   }
+   ```
+
+### Manual Deployment
+
+```bash
+# Deploy to preview
+vercel
+
+# Deploy to production
+vercel --prod
 ```
+
+---
+
+## 🧪 Testing Deployment
+
+### 1. Test Frontend
+- [ ] Visit frontend URL
+- [ ] Sign up/Sign in works
+- [ ] Photos upload successfully
+- [ ] Map displays correctly
+- [ ] Search functionality works
+
+### 2. Test Backend
+- [ ] Health check: `https://your-backend.vercel.app/health`
+- [ ] API endpoints respond correctly
+- [ ] Authentication works
+- [ ] File uploads work
+
+### 3. Test Integration
+- [ ] Frontend can connect to backend
+- [ ] CORS is configured correctly
+- [ ] Google OAuth redirect works
+- [ ] Google Maps loads
+- [ ] Google Photos import works
+
+### 4. Test PWA
+- [ ] Service worker registers
+- [ ] App works offline (cached pages)
+- [ ] "Add to Home Screen" works
+- [ ] App icon displays correctly
+- [ ] Splash screen shows on launch
+
+---
+
+## 🔧 Troubleshooting Deployment
+
+### Issue: "Module not found" errors
+**Solution**:
+- Ensure all dependencies are in `package.json`
+- Run `npm install` before building
+- Check `package-lock.json` is committed
+
+### Issue: "Environment variable not found"
+**Solution**:
+- Verify all env vars are set in Vercel Dashboard
+- Check variable names match exactly (case-sensitive)
+- Redeploy after adding variables
+
+### Issue: "CORS error" in production
+**Solution**:
+- Update `CORS_ORIGIN` in backend to include production URL
+- Format: `https://your-frontend.vercel.app,http://localhost:3000`
+- Redeploy backend
+
+### Issue: "Google OAuth redirect mismatch"
+**Solution**:
+- Verify redirect URI in Google Console matches exactly
+- Must be `https://` (not `http://`) for production
+- No trailing slash
+- Wait a few minutes for changes to propagate
+
+### Issue: "Service worker not registering"
+**Solution**:
+- Ensure app is served over HTTPS (Vercel does this automatically)
+- Check `manifest.json` is in `public/` folder
+- Verify service worker file exists in `build/` after build
+
+### Issue: "Backend functions timeout"
+**Solution**:
+- Vercel free tier has 10-second timeout for serverless functions
+- Optimize long-running operations
+- Consider using Vercel Pro for longer timeouts
+- Or use alternative hosting (Railway, Render) for backend
 
 ### Option 2: Railway (Alternative)
 
@@ -535,16 +915,45 @@ firebase deploy --only hosting
 
 ### Post-Deployment Checklist
 
+- [ ] Frontend deployed and accessible
+- [ ] Backend deployed and accessible
+- [ ] Health check endpoint responds
 - [ ] Update CORS origins in backend
 - [ ] Update Google OAuth redirect URIs
 - [ ] Update Google Maps API key restrictions
-- [ ] Test authentication flow
+- [ ] All environment variables configured
+- [ ] Test authentication flow (sign up/sign in)
 - [ ] Test photo upload
 - [ ] Test map functionality
 - [ ] Test Google Photos import
 - [ ] Verify HTTPS is working
 - [ ] Check Firebase rules are deployed
-- [ ] Monitor error logs
+- [ ] PWA installable and works offline
+- [ ] Service worker registered
+- [ ] Monitor error logs in Vercel Dashboard
+- [ ] Test on mobile devices
+- [ ] Verify all API endpoints work
+
+### Vercel Dashboard Monitoring
+
+1. **View Deployments**:
+   - Go to your project in Vercel Dashboard
+   - See all deployments (production, preview)
+   - View build logs and errors
+
+2. **Monitor Performance**:
+   - Analytics tab shows page views, performance metrics
+   - Functions tab shows API usage and response times
+
+3. **View Logs**:
+   - Click on any deployment
+   - View function logs for debugging
+   - Check for errors or warnings
+
+4. **Environment Variables**:
+   - Settings > Environment Variables
+   - Manage all secrets securely
+   - Different values for Production/Preview/Development
 
 ---
 

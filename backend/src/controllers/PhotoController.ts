@@ -60,9 +60,12 @@ export class PhotoController {
       const uploaded: any[] = [];
       const errors: any[] = [];
 
+      // Get optional tripId from query parameter
+      const tripId = req.query.tripId as string | undefined;
+
       // Process each file
       for (const file of req.files) {
-        const { photo, error } = await photoService.uploadPhoto(user.uid, file);
+        const { photo, error } = await photoService.uploadPhoto(user.uid, file, tripId);
         
         // Collect results
         if (error) {
@@ -72,10 +75,19 @@ export class PhotoController {
         }
       }
 
+      // Determine success status
+      const allFailed = uploaded.length === 0 && errors.length > 0;
+      const allSucceeded = errors.length === 0;
+      const partialSuccess = uploaded.length > 0 && errors.length > 0;
+
       // Return summary of uploads
-      res.status(201).json({
-        success: true,
-        message: `Uploaded ${uploaded.length} of ${req.files.length} photos`,
+      res.status(allFailed ? 400 : 201).json({
+        success: !allFailed, // false if all failed, true otherwise
+        message: allFailed 
+          ? `Failed to upload all ${req.files.length} photo(s)`
+          : allSucceeded
+            ? `Successfully uploaded ${uploaded.length} photo(s)`
+            : `Uploaded ${uploaded.length} of ${req.files.length} photos`,
         uploaded,
         errors
       });
@@ -140,24 +152,30 @@ export class PhotoController {
       const { timeline, total, error } = await photoService.getPhotoTimeline(user.uid);
 
       if (error) {
+        console.error('Timeline service error:', error);
         return res.status(500).json({ success: false, error });
       }
 
       // Convert timeline object to array format
+      // Handle empty timeline (no photos)
+      const timelineArray = timeline && typeof timeline === 'object'
+        ? Object.entries(timeline).map(([date, photos]) => ({
+            date,
+            photos
+          }))
+        : [];
+
       res.json({
         success: true,
-        timeline: Object.entries(timeline).map(([date, photos]) => ({
-          date,
-          photos
-        })),
-        total
+        timeline: timelineArray,
+        total: total || 0
       });
 
     } catch (error: any) {
       console.error('Timeline error:', error);
       res.status(500).json({
         success: false,
-        error: 'Internal server error'
+        error: error.message || 'Internal server error'
       });
     }
   }
@@ -276,6 +294,40 @@ export class PhotoController {
 
     } catch (error: any) {
       console.error('Update photo error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
+
+  // Rotate photo
+  static async rotatePhoto(req: Request, res: Response) {
+    try {
+      // Get authenticated user, photo ID, and rotation angle
+      const { user } = req as AuthenticatedRequest;
+      const { photoId } = req.params;
+      const { angle } = req.body;
+
+      // Validate angle
+      if (!angle || ![90, 180, 270].includes(angle)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Invalid rotation angle. Must be 90, 180, or 270 degrees.' 
+        });
+      }
+
+      // Rotate photo using service
+      const { photo, error } = await photoService.rotatePhoto(photoId, user.uid, angle);
+
+      if (error) {
+        return res.status(400).json({ success: false, error });
+      }
+
+      res.json({ success: true, photo });
+
+    } catch (error: any) {
+      console.error('Rotate photo error:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error'

@@ -12,19 +12,23 @@ export class TripController {
 
       const { name, description, photoIds, startDate, endDate } = req.body;
 
-      if (!name || !photoIds || !startDate || !endDate) {
+      if (!name || !photoIds) {
         return res.status(400).json({
           success: false,
-          error: 'Missing required fields: name, photoIds, startDate, endDate'
+          error: 'Missing required fields: name, photoIds'
         });
       }
+
+      // Use provided dates or default to current date (for albums that don't need dates)
+      const tripStartDate = startDate || new Date().toISOString();
+      const tripEndDate = endDate || new Date().toISOString();
 
       const result = await tripService.createTrip(req.user.uid, {
         name,
         description,
         photoIds,
-        startDate,
-        endDate
+        startDate: tripStartDate,
+        endDate: tripEndDate
       });
 
       if (result.error) {

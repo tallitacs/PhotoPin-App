@@ -52,6 +52,10 @@ router.put('/:photoId', (req: Request, res: Response) =>
   PhotoController.updatePhoto(req as AuthenticatedRequest, res)
 );
 
+router.post('/:photoId/rotate', (req: Request, res: Response) =>
+  PhotoController.rotatePhoto(req as AuthenticatedRequest, res)
+);
+
 router.delete('/:photoId', (req: Request, res: Response) =>
   PhotoController.deletePhoto(req as AuthenticatedRequest, res)
 );

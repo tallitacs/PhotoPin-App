@@ -7,10 +7,13 @@ import { Navbar } from './components/Common/Navbar';
 // Page components
 import { LoginForm } from './components/Auth/LoginForm';
 import { SignupForm } from './components/Auth/SignupForm';
+import { HomePage } from './components/Home/HomePage';
 import { PhotoGallery } from './components/Photos/PhotoGallery';
-import { MapView } from './components/Map/MapView';
 import { TimelineView } from './components/Timeline/TimelineView';
 import { PhotoUpload } from './components/Photos/PhotoUpload';
+import { AlbumsView } from './components/Albums/AlbumsView';
+import { AlbumDetailView } from './components/Albums/AlbumDetailView';
+import { MemoriesView } from './components/Memories/MemoriesView';
 // Google Photos components
 import { GooglePhotosImport } from './components/Import/GooglePhotosImport';
 import { GoogleCallback } from './components/Import/GoogleCallback';
@@ -49,7 +52,7 @@ function App() {
             path="/"
             element={
               <ProtectedRoute>
-                <PhotoGallery />
+                <HomePage />
               </ProtectedRoute>
             }
           />
@@ -62,6 +65,14 @@ function App() {
             }
           />
           <Route
+            path="/gallery"
+            element={
+              <ProtectedRoute>
+                <PhotoGallery />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/timeline"
             element={
               <ProtectedRoute>
@@ -70,10 +81,26 @@ function App() {
             }
           />
           <Route
-            path="/map"
+            path="/albums"
             element={
               <ProtectedRoute>
-                <MapView />
+                <AlbumsView />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/albums/:id"
+            element={
+              <ProtectedRoute>
+                <AlbumDetailView />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/memories"
+            element={
+              <ProtectedRoute>
+                <MemoriesView />
               </ProtectedRoute>
             }
           />

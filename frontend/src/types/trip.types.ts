@@ -15,11 +15,12 @@ export interface Trip {
   userId: string;
   name: string;
   description?: string;
-  startDate: string; // ISO string
-  endDate: string; // ISO string
+  startDate?: string; // ISO string (optional to handle existing trips)
+  endDate?: string; // ISO string (optional to handle existing trips)
   photoIds: string[];
   coverPhotoUrl?: string;
-  location?: TripLocation;
+  location?: TripLocation; // GPS coordinates for map
+  locationName?: string; // Display location name (e.g., "Paris, France")
   createdAt: string; // ISO string
   updatedAt: string; // ISO string
 }

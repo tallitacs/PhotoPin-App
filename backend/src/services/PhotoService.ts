@@ -1,6 +1,7 @@
 import { db, bucket } from '../config/firebaseAdmin';
 import { PhotoMetadataUtil } from '../utils/photoMetadata';
 import { v4 as uuidv4 } from 'uuid';
+import sharp from 'sharp';
 import {
   Photo,
   PhotoUploadResult,
@@ -15,7 +16,7 @@ export class PhotoService {
   private photosCollection = db.collection('photos');
 
   // Upload photo with thumbnail generation and metadata extraction
-  async uploadPhoto(userId: string, file: Express.Multer.File): Promise<PhotoUploadResult> {
+  async uploadPhoto(userId: string, file: Express.Multer.File, tripId?: string): Promise<PhotoUploadResult> {
     try {
       // Validate file type
       if (!PhotoMetadataUtil.isValidImageFile(file.mimetype, file.originalname)) {
@@ -31,6 +32,12 @@ export class PhotoService {
 
       // Extract EXIF metadata (GPS, camera info, date taken, etc.)
       const metadata = await PhotoMetadataUtil.extractMetadata(file.buffer, file.originalname);
+      
+      // Ensure takenAt is always set (required for queries)
+      if (!metadata.takenAt) {
+        metadata.takenAt = new Date().toISOString();
+        console.log('No EXIF date found, using current date');
+      }
 
       // Generate automatic tags based on metadata
       const tags = PhotoMetadataUtil.generateTags(metadata, file.originalname);
@@ -84,16 +91,49 @@ export class PhotoService {
         thumbnailUrl,
         metadata,
         tags,
+        tripId: tripId || undefined, // Associate with trip/album if provided
         uploadedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
       // Save photo document to Firestore database
+      console.log('Saving photo to Firestore:', { photoId, userId, fileName: file.originalname, tripId });
       await this.photosCollection.doc(photoId).set(photoData);
+      console.log('Photo saved successfully to Firestore');
+
+      // If tripId is provided, update the trip's photoIds and coverPhotoUrl
+      if (tripId) {
+        try {
+          const tripRef = db.collection('trips').doc(tripId);
+          const tripDoc = await tripRef.get();
+          
+          if (tripDoc.exists) {
+            const trip = tripDoc.data();
+            if (trip && trip.userId === userId) {
+              const currentPhotoIds = trip.photoIds || [];
+              if (!currentPhotoIds.includes(photoId)) {
+                await tripRef.update({
+                  photoIds: [...currentPhotoIds, photoId],
+                  coverPhotoUrl: trip.coverPhotoUrl || thumbnailUrl, // Set cover if not already set
+                  updatedAt: new Date().toISOString()
+                });
+              }
+            }
+          }
+        } catch (tripError) {
+          console.warn('Failed to update trip with new photo:', tripError);
+          // Don't fail the upload if trip update fails
+        }
+      }
 
       return { photo: photoData };
     } catch (error: any) {
       console.error('Upload error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
       return { error: error.message || 'Failed to upload photo' };
     }
   }
@@ -213,12 +253,36 @@ export class PhotoService {
       };
 
       if (updates.tags) allowedUpdates.tags = updates.tags;
-      if (updates.tripId !== undefined) allowedUpdates.tripId = updates.tripId;
+      // Allow setting tripId to null/undefined to remove photo from trip/album
+      if (updates.tripId !== undefined) {
+        allowedUpdates.tripId = updates.tripId || null;
+      }
+      if (updates.displayName !== undefined) allowedUpdates.displayName = updates.displayName || null; // Allow clearing displayName
+      if (updates.isFavorite !== undefined) allowedUpdates.isFavorite = updates.isFavorite || false;
       if (updates.metadata) {
         allowedUpdates.metadata = {
           ...photo.metadata,
           ...updates.metadata
         };
+        // If GPS is explicitly set to undefined/null, remove it
+        if (updates.metadata.gps === undefined || updates.metadata.gps === null) {
+          allowedUpdates.metadata.gps = null;
+        }
+      }
+      
+      // Update location if provided (for reverse geocoded location info)
+      // Allow setting location to null to clear it, or updating with address/city/country without GPS
+      if (updates.location !== undefined) {
+        if (updates.location === null) {
+          // Clear location
+          allowedUpdates.location = null;
+        } else {
+          // Update location (can include just address/city/country without GPS)
+          allowedUpdates.location = {
+            ...photo.location, // Preserve existing location data
+            ...updates.location // Override with new values
+          };
+        }
       }
 
       // Update photo document in Firestore
@@ -230,6 +294,97 @@ export class PhotoService {
     } catch (error: any) {
       console.error('Update photo error:', error);
       return { error: error.message || 'Failed to update photo' };
+    }
+  }
+
+  // Rotate photo by specified angle (90, 180, or 270 degrees)
+  async rotatePhoto(photoId: string, userId: string, angle: number): Promise<PhotoQueryResult> {
+    try {
+      // Validate angle
+      if (![90, 180, 270].includes(angle)) {
+        return { error: 'Invalid rotation angle. Must be 90, 180, or 270 degrees.' };
+      }
+
+      // Fetch photo to verify existence and ownership
+      const doc = await this.photosCollection.doc(photoId).get();
+
+      if (!doc.exists) {
+        return { error: 'Photo not found' };
+      }
+
+      const photo = doc.data() as Photo;
+
+      // Verify user owns this photo
+      if (photo.userId !== userId) {
+        return { error: 'Access denied' };
+      }
+
+      // Get current rotation or default to 0
+      const currentRotation = photo.metadata?.rotation || 0;
+      const newRotation = (currentRotation + angle) % 360;
+
+      // Download original image from storage
+      const fileRef = bucket.file(photo.storagePath);
+      const [fileBuffer] = await fileRef.download();
+
+      // Rotate image using Sharp
+      const rotatedBuffer = await sharp(fileBuffer)
+        .rotate(angle)
+        .toBuffer();
+
+      // Get file metadata
+      const [fileMetadata] = await fileRef.getMetadata();
+
+      // Upload rotated image back to storage
+      await fileRef.save(rotatedBuffer, {
+        metadata: {
+          contentType: fileMetadata.contentType,
+          metadata: fileMetadata.metadata
+        }
+      });
+
+      // Regenerate thumbnail with rotation
+      const thumbnailBuffer = await PhotoMetadataUtil.generateThumbnail(rotatedBuffer);
+      
+      // Extract thumbnail path from thumbnailUrl
+      const thumbnailPath = photo.thumbnailUrl 
+        ? photo.thumbnailUrl.split('/').slice(-2).join('/') // Get last 2 parts (thumbnails/filename)
+        : photo.storagePath.replace('photos', 'thumbnails').replace(/\.[^.]+$/, '_thumb.jpg');
+      
+      const thumbnailRef = bucket.file(thumbnailPath);
+      await thumbnailRef.save(thumbnailBuffer, {
+        metadata: {
+          contentType: 'image/jpeg',
+          metadata: {
+            userId,
+            photoId,
+            isThumbnail: 'true'
+          }
+        }
+      });
+      
+      // Make thumbnail public
+      await thumbnailRef.makePublic();
+
+      // Get new dimensions after rotation
+      const rotatedMetadata = await sharp(rotatedBuffer).metadata();
+      const newWidth = rotatedMetadata.width || photo.metadata.width;
+      const newHeight = rotatedMetadata.height || photo.metadata.height;
+
+      // Update photo document with new rotation and dimensions
+      await this.photosCollection.doc(photoId).update({
+        'metadata.rotation': newRotation,
+        'metadata.width': newWidth,
+        'metadata.height': newHeight,
+        updatedAt: new Date().toISOString()
+      });
+
+      // Fetch and return updated photo
+      const updatedDoc = await this.photosCollection.doc(photoId).get();
+      return { photo: updatedDoc.data() as Photo };
+    } catch (error: any) {
+      console.error('Rotate photo error:', error);
+      return { error: error.message || 'Failed to rotate photo' };
     }
   }
 
@@ -282,29 +437,49 @@ export class PhotoService {
     }
   }
 
-  // Get photos that have GPS location data for map display
+  // Get photos that have location data (GPS or address) for map display
   async getPhotosWithLocation(userId: string): Promise<PhotosQueryResult> {
     try {
-      // Query photos with location tag, sorted by date
+      // Get all user photos (we'll filter for location data client-side)
+      // This is more flexible than querying by tag since location can be added manually
+      // Remove orderBy to avoid index requirement - we'll sort client-side if needed
       const query = this.photosCollection
-        .where('userId', '==', userId)
-        .where('tags', 'array-contains', 'has-location')
-        .orderBy('metadata.takenAt', 'desc');
+        .where('userId', '==', userId);
 
       const snapshot = await query.get();
       const photos: Photo[] = [];
 
-      // Filter to only include photos with actual GPS coordinates
+      console.log(`Found ${snapshot.size} total photos for user ${userId}`);
+
+      // Filter to include photos with GPS coordinates OR location address data
       snapshot.forEach((doc) => {
         const photo = doc.data() as Photo;
-        if (photo.metadata.gps) {
+        
+        // Debug logging
+        const hasGPS = !!(photo.metadata?.gps?.latitude && photo.metadata?.gps?.longitude);
+        const hasLocation = !!(photo.location && (photo.location.address || photo.location.city || photo.location.country));
+        
+        if (hasGPS) {
+          console.log(`Photo ${photo.id} has GPS:`, photo.metadata?.gps);
           photos.push(photo);
+        } else if (hasLocation) {
+          console.log(`Photo ${photo.id} has location data:`, photo.location);
+          // Photo has address but no GPS - will need geocoding on frontend
+          photos.push(photo);
+        } else {
+          console.log(`Photo ${photo.id} (${photo.fileName}) has no location data`);
         }
       });
 
+      console.log(`Returning ${photos.length} photos with location data`);
       return { photos, total: photos.length };
     } catch (error: any) {
       console.error('Get location photos error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
       return { error: error.message || 'Failed to retrieve location photos' };
     }
   }
@@ -357,8 +532,14 @@ export class PhotoService {
       // Get user's photos with filters
       const result = await this.getUserPhotos(userId, filters);
 
-      if (result.error || !result.photos) {
-        return { error: result.error || 'No photos found' };
+      // If there's an error (not just no photos), return it
+      if (result.error) {
+        return { error: result.error };
+      }
+
+      // If no photos found, return empty timeline (not an error)
+      if (!result.photos || result.photos.length === 0) {
+        return { timeline: {}, total: 0 };
       }
 
       // Group photos by date (YYYY-MM-DD format)
@@ -366,7 +547,8 @@ export class PhotoService {
 
       result.photos.forEach(photo => {
         // Extract date from takenAt timestamp
-        const date = photo.metadata.takenAt
+        // Handle cases where metadata might be undefined
+        const date = photo.metadata?.takenAt
           ? new Date(photo.metadata.takenAt).toISOString().split('T')[0]
           : 'unknown';
 

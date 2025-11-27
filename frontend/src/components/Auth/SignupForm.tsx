@@ -26,16 +26,32 @@ export const SignupForm: React.FC = () => {
       setError('Passwords do not match');
       return;
     }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
     setError('');
     try {
       const user = await signup(email, password);
       if (user) {
         navigate('/');
-      } else {
-        setError('Failed to sign up. This email may already be in use.');
       }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      // Handle Firebase Auth errors
+      let errorMessage = 'Failed to sign up. Please try again.';
+      if (err.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already registered. Please sign in instead.';
+      } else if (err.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address.';
+      } else if (err.code === 'auth/weak-password') {
+        errorMessage = 'Password is too weak. Please use a stronger password.';
+      } else if (err.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      setError(errorMessage);
     }
   };
 
@@ -56,6 +72,32 @@ export const SignupForm: React.FC = () => {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                '&.Mui-focused': {
+                  '& fieldset': {
+                    borderColor: '#ff7a33', // Lighter orange for focus border
+                  },
+                  backgroundColor: 'rgba(255, 122, 51, 0.08)', // Light orange background when focused
+                },
+                // Override browser autofill styles with darker background
+                '& input:-webkit-autofill': {
+                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.8) inset !important',
+                  WebkitTextFillColor: 'rgba(255, 255, 255, 0.87) !important',
+                  caretColor: 'rgba(255, 255, 255, 0.87) !important',
+                  transition: 'background-color 5000s ease-in-out 0s', // Prevent color change
+                },
+                '& input:-webkit-autofill:hover': {
+                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.9) inset !important',
+                },
+                '& input:-webkit-autofill:focus': {
+                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.95) inset !important',
+                },
+              },
+              '& .MuiInputLabel-root.Mui-focused': {
+                color: '#ff7a33', // Lighter orange for label when focused
+              },
+            }}
           />
           <TextField
             margin="normal"
@@ -67,6 +109,32 @@ export const SignupForm: React.FC = () => {
             id="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                '&.Mui-focused': {
+                  '& fieldset': {
+                    borderColor: '#ff7a33', // Lighter orange for focus border
+                  },
+                  backgroundColor: 'rgba(255, 122, 51, 0.08)', // Light orange background when focused
+                },
+                // Override browser autofill styles with darker background
+                '& input:-webkit-autofill': {
+                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.8) inset !important',
+                  WebkitTextFillColor: 'rgba(255, 255, 255, 0.87) !important',
+                  caretColor: 'rgba(255, 255, 255, 0.87) !important',
+                  transition: 'background-color 5000s ease-in-out 0s', // Prevent color change
+                },
+                '& input:-webkit-autofill:hover': {
+                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.9) inset !important',
+                },
+                '& input:-webkit-autofill:focus': {
+                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.95) inset !important',
+                },
+              },
+              '& .MuiInputLabel-root.Mui-focused': {
+                color: '#ff7a33', // Lighter orange for label when focused
+              },
+            }}
           />
           <TextField
             margin="normal"
@@ -78,6 +146,32 @@ export const SignupForm: React.FC = () => {
             id="confirmPassword"
             value={confirmPass}
             onChange={(e) => setConfirmPass(e.target.value)}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                '&.Mui-focused': {
+                  '& fieldset': {
+                    borderColor: '#ff7a33', // Lighter orange for focus border
+                  },
+                  backgroundColor: 'rgba(255, 122, 51, 0.08)', // Light orange background when focused
+                },
+                // Override browser autofill styles with darker background
+                '& input:-webkit-autofill': {
+                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.8) inset !important',
+                  WebkitTextFillColor: 'rgba(255, 255, 255, 0.87) !important',
+                  caretColor: 'rgba(255, 255, 255, 0.87) !important',
+                  transition: 'background-color 5000s ease-in-out 0s', // Prevent color change
+                },
+                '& input:-webkit-autofill:hover': {
+                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.9) inset !important',
+                },
+                '& input:-webkit-autofill:focus': {
+                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.95) inset !important',
+                },
+              },
+              '& .MuiInputLabel-root.Mui-focused': {
+                color: '#ff7a33', // Lighter orange for label when focused
+              },
+            }}
           />
           {error && (
             <Typography color="error" variant="body2" sx={{ mt: 1 }}>

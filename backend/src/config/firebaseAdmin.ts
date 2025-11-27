@@ -53,7 +53,22 @@ if (!admin.apps.length) {
 export const auth = admin.auth();
 export const db = admin.firestore();
 export const storage = admin.storage();
-export const bucket = storage.bucket();
+// Get bucket with explicit name from environment variable
+export const bucket = storage.bucket(process.env.FIREBASE_STORAGE_BUCKET);
+
+// Verify bucket exists on startup
+bucket.exists()
+  .then(([exists]) => {
+    if (exists) {
+      console.log(`✅ Storage bucket verified: ${process.env.FIREBASE_STORAGE_BUCKET}`);
+    } else {
+      console.error(`❌ Storage bucket does NOT exist: ${process.env.FIREBASE_STORAGE_BUCKET}`);
+      console.error('Please create the bucket in Firebase Console: https://console.firebase.google.com/project/photopin-d0d05/storage');
+    }
+  })
+  .catch((error) => {
+    console.error('❌ Error checking bucket:', error.message);
+  });
 
 // Set Firestore settings for better performance
 db.settings({

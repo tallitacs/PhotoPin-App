@@ -98,8 +98,9 @@ export const environment: Environment = {
   // Security settings
   security: {
     jwtSecret: process.env.JWT_SECRET || 'default-secret-change-in-production',
+    // Increased rate limits for development: 1000 requests per 15 minutes (was 100)
     rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
-    rateLimitMaxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10)
+    rateLimitMaxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000', 10)
   },
 
   // File upload settings
