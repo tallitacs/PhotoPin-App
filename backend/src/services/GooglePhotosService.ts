@@ -40,13 +40,18 @@ export class GooglePhotosService {
     });
 
     // Generate authorization URL with offline access
+    // include_granted_scopes: false - Don't include previously granted scopes, force fresh consent
+    // prompt: 'consent' - Always show consent screen
+    // access_type: 'offline' - Request refresh token
     const authUrl = this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: scopes,
-      prompt: 'consent' // Force consent screen to show
+      prompt: 'consent', // Force consent screen to show
+      include_granted_scopes: false // Force fresh consent, don't use previously granted scopes
     });
 
     console.log('Generated Auth URL:', authUrl);
+    console.log('⚠️ IMPORTANT: Make sure you grant ALL permissions when the consent screen appears!');
     return authUrl;
   }
 
@@ -63,8 +68,28 @@ export class GooglePhotosService {
           const tokenInfo = await this.verifyToken(tokens.access_token);
           if (tokenInfo) {
             console.log('Token scopes after exchange:', tokenInfo.scope);
+            
+            // Validate that the token has the required Google Photos scope
+            const scopes = tokenInfo.scope?.split(' ') || [];
+            const hasPhotosScope = scopes.some((scope: string) => 
+              scope.includes('photoslibrary.readonly') || 
+              scope.includes('photoslibrary.sharing')
+            );
+            
+            if (!hasPhotosScope) {
+              console.error('❌ CRITICAL: Token does NOT have Google Photos scope!');
+              console.error('Token scopes:', scopes);
+              console.error('Expected scope: https://www.googleapis.com/auth/photoslibrary.readonly');
+              throw new Error('Token does not have required Google Photos permissions. Please disconnect, clear browser cache/cookies for Google, and reconnect. Make sure to grant ALL permissions when prompted.');
+            } else {
+              console.log('✅ Token has required Google Photos scope');
+            }
           }
-        } catch (verifyError) {
+        } catch (verifyError: any) {
+          // If verification fails, log but don't fail - the API call will tell us if there's a problem
+          if (verifyError.message && verifyError.message.includes('required Google Photos permissions')) {
+            throw verifyError; // Re-throw if it's our validation error
+          }
           console.warn('Could not verify token scopes:', verifyError);
         }
       }

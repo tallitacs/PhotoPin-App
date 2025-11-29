@@ -93,13 +93,23 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start server on configured port
+// Start server on configured port (only in local development, not on Vercel)
+// Vercel serverless functions handle the server lifecycle automatically
 const PORT = environment.port;
 
-app.listen(PORT, () => {
-  console.log(`🚀 PhotoPin API running on port ${PORT}`);
+// Only start the server if not running on Vercel (serverless environment)
+// Vercel sets VERCEL environment variable automatically
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 PhotoPin API running on port ${PORT}`);
+    console.log(`📍 Environment: ${environment.nodeEnv}`);
+    console.log(`🔥 Firebase Project: ${environment.firebase.projectId}`);
+  });
+} else {
+  console.log(`🚀 PhotoPin API running on Vercel`);
   console.log(`📍 Environment: ${environment.nodeEnv}`);
   console.log(`🔥 Firebase Project: ${environment.firebase.projectId}`);
-});
+}
 
+// Export app for Vercel serverless functions
 export default app;

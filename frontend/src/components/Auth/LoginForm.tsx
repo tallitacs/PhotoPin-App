@@ -68,26 +68,46 @@ export const LoginForm: React.FC = () => {
             autoFocus
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            InputLabelProps={{
+              sx: {
+                marginTop: '4px', // Push label up a bit
+              }
+            }}
             sx={{
+              mt: 3, // Add more top margin for spacing
+              mb: 1, // Add bottom margin to separate from next field
               '& .MuiOutlinedInput-root': {
+                backgroundColor: (theme) => theme.palette.mode === 'dark' ? '#1e1e1e' : 'transparent',
                 '&.Mui-focused': {
                   '& fieldset': {
                     borderColor: '#ff7a33', // Lighter orange for focus border
                   },
-                  backgroundColor: 'rgba(255, 122, 51, 0.08)', // Light orange background when focused
+                  backgroundColor: (theme) => theme.palette.mode === 'dark' 
+                    ? '#1e1e1e' 
+                    : 'rgba(255, 122, 51, 0.08)', // Light orange background when focused
                 },
-                // Override browser autofill styles with light orange background
+                // Override browser autofill styles
                 '& input:-webkit-autofill': {
-                  WebkitBoxShadow: '0 0 0 100px #fff5f0 inset !important',
-                  WebkitTextFillColor: '#ff8c5a !important',
-                  caretColor: '#ff8c5a !important',
+                  WebkitBoxShadow: (theme) => theme.palette.mode === 'dark'
+                    ? '0 0 0 100px #1e1e1e inset !important'
+                    : '0 0 0 100px #fff5f0 inset !important',
+                  WebkitTextFillColor: (theme) => theme.palette.mode === 'dark'
+                    ? '#ffffff !important'
+                    : '#ff8c5a !important',
+                  caretColor: (theme) => theme.palette.mode === 'dark'
+                    ? '#ffffff !important'
+                    : '#ff8c5a !important',
                   transition: 'background-color 5000s ease-in-out 0s', // Prevent color change
                 },
                 '& input:-webkit-autofill:hover': {
-                  WebkitBoxShadow: '0 0 0 100px #fff5f0 inset !important',
+                  WebkitBoxShadow: (theme) => theme.palette.mode === 'dark'
+                    ? '0 0 0 100px #1e1e1e inset !important'
+                    : '0 0 0 100px #fff5f0 inset !important',
                 },
                 '& input:-webkit-autofill:focus': {
-                  WebkitBoxShadow: '0 0 0 100px #fff5f0 inset !important',
+                  WebkitBoxShadow: (theme) => theme.palette.mode === 'dark'
+                    ? '0 0 0 100px #1e1e1e inset !important'
+                    : '0 0 0 100px #fff5f0 inset !important',
                 },
               },
               '& .MuiInputLabel-root.Mui-focused': {
@@ -106,26 +126,46 @@ export const LoginForm: React.FC = () => {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            InputLabelProps={{
+              sx: {
+                marginTop: '4px', // Push label up a bit
+              }
+            }}
             sx={{
+              mt: 3, // Add more top margin for spacing
+              mb: 1, // Add bottom margin to separate from next field
               '& .MuiOutlinedInput-root': {
+                backgroundColor: (theme) => theme.palette.mode === 'dark' ? '#1e1e1e' : 'transparent',
                 '&.Mui-focused': {
                   '& fieldset': {
                     borderColor: '#ff7a33', // Lighter orange for focus border
                   },
-                  backgroundColor: 'rgba(255, 122, 51, 0.08)', // Light orange background when focused
+                  backgroundColor: (theme) => theme.palette.mode === 'dark' 
+                    ? '#1e1e1e' 
+                    : 'rgba(255, 122, 51, 0.08)', // Light orange background when focused
                 },
-                // Override browser autofill styles with light orange background
+                // Override browser autofill styles
                 '& input:-webkit-autofill': {
-                  WebkitBoxShadow: '0 0 0 100px #fff5f0 inset !important',
-                  WebkitTextFillColor: '#ff8c5a !important',
-                  caretColor: '#ff8c5a !important',
+                  WebkitBoxShadow: (theme) => theme.palette.mode === 'dark'
+                    ? '0 0 0 100px #1e1e1e inset !important'
+                    : '0 0 0 100px #fff5f0 inset !important',
+                  WebkitTextFillColor: (theme) => theme.palette.mode === 'dark'
+                    ? '#ffffff !important'
+                    : '#ff8c5a !important',
+                  caretColor: (theme) => theme.palette.mode === 'dark'
+                    ? '#ffffff !important'
+                    : '#ff8c5a !important',
                   transition: 'background-color 5000s ease-in-out 0s', // Prevent color change
                 },
                 '& input:-webkit-autofill:hover': {
-                  WebkitBoxShadow: '0 0 0 100px #fff5f0 inset !important',
+                  WebkitBoxShadow: (theme) => theme.palette.mode === 'dark'
+                    ? '0 0 0 100px #1e1e1e inset !important'
+                    : '0 0 0 100px #fff5f0 inset !important',
                 },
                 '& input:-webkit-autofill:focus': {
-                  WebkitBoxShadow: '0 0 0 100px #fff5f0 inset !important',
+                  WebkitBoxShadow: (theme) => theme.palette.mode === 'dark'
+                    ? '0 0 0 100px #1e1e1e inset !important'
+                    : '0 0 0 100px #fff5f0 inset !important',
                 },
               },
               '& .MuiInputLabel-root.Mui-focused': {
