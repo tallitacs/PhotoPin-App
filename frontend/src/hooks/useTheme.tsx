@@ -64,6 +64,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
           default: '#f4f6f8',
           paper: '#ffffff',
         },
+        text: {
+          primary: '#ff8c5a', // Light orange for primary text (replaces dark grey)
+          secondary: '#ffa366', // Lighter orange for secondary text
+        },
       }),
     },
     typography: {
@@ -83,6 +87,31 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
           root: {
             ...(mode === 'dark' && {
               backgroundColor: '#1e1e1e',
+            }),
+          },
+        },
+      },
+      MuiTextField: {
+        styleOverrides: {
+          root: {
+            ...(mode === 'light' && {
+              '& .MuiInputLabel-root': {
+                color: '#ff8c5a', // Light orange for labels
+              },
+              '& .MuiOutlinedInput-root': {
+                '& .MuiOutlinedInput-input': {
+                  color: '#ff8c5a', // Light orange for input text
+                },
+              },
+            }),
+          },
+        },
+      },
+      MuiTypography: {
+        styleOverrides: {
+          root: {
+            ...(mode === 'light' && {
+              color: '#ff8c5a', // Light orange for typography
             }),
           },
         },

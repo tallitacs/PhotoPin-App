@@ -1,68 +1,92 @@
 // backend/src/config/firebaseAdmin.ts
 import * as admin from 'firebase-admin';
 import dotenv from 'dotenv';
+import * as path from 'path';
 
 // Load environment variables
 dotenv.config();
 
-// List of required environment variables
-const requiredEnvVars = [
-  'FIREBASE_PROJECT_ID',
-  'FIREBASE_PRIVATE_KEY_ID',
-  'FIREBASE_PRIVATE_KEY',
-  'FIREBASE_CLIENT_EMAIL',
-  'FIREBASE_CLIENT_ID'
-];
+// Load Firebase credentials from file or environment variables
+let serviceAccount: any;
 
-// Validate that all required environment variables are present
-for (const envVar of requiredEnvVars) {
-  if (!process.env[envVar]) {
-    throw new Error(`Missing required environment variable: ${envVar}`);
+try {
+  // Try to load from file first (for local development)
+  const credentialsPath = path.join(__dirname, '../../firebase-credentials.json');
+  const credentialsFile = require(credentialsPath);
+  serviceAccount = {
+    projectId: credentialsFile.project_id,
+    privateKeyId: credentialsFile.private_key_id,
+    privateKey: credentialsFile.private_key,
+    clientEmail: credentialsFile.client_email,
+    clientId: credentialsFile.client_id,
+    authUri: credentialsFile.auth_uri,
+    tokenUri: credentialsFile.token_uri,
+    authProviderX509CertUrl: credentialsFile.auth_provider_x509_cert_url,
+    clientX509CertUrl: credentialsFile.client_x509_cert_url,
+    universeDomain: credentialsFile.universe_domain
+  };
+  console.log('✅ Loaded Firebase credentials from firebase-credentials.json');
+} catch (error) {
+  // Fall back to environment variables (for production/Railway)
+  const requiredEnvVars = [
+    'FIREBASE_PROJECT_ID',
+    'FIREBASE_PRIVATE_KEY_ID',
+    'FIREBASE_PRIVATE_KEY',
+    'FIREBASE_CLIENT_EMAIL',
+    'FIREBASE_CLIENT_ID'
+  ];
+
+  // Validate that all required environment variables are present
+  for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+      throw new Error(`Missing required environment variable: ${envVar}`);
+    }
   }
-}
 
-// Construct the service account object
-const serviceAccount = {
-  type: "service_account" as const,
-  project_id: process.env.FIREBASE_PROJECT_ID!,
-  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID!,
-  // Replace escaped newlines with actual newlines in the private key
-  private_key: process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
-  client_email: process.env.FIREBASE_CLIENT_EMAIL!,
-  client_id: process.env.FIREBASE_CLIENT_ID!,
-  auth_uri: "https://accounts.google.com/o/oauth2/auth",
-  token_uri: "https://oauth2.googleapis.com/token",
-  auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
-  client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${process.env.FIREBASE_CLIENT_EMAIL!.replace('@', '%40')}`,
-  universe_domain: "googleapis.com"
-};
+  // Construct the service account object from environment variables
+  serviceAccount = {
+    projectId: process.env.FIREBASE_PROJECT_ID!,
+    privateKeyId: process.env.FIREBASE_PRIVATE_KEY_ID!,
+    // Replace escaped newlines with actual newlines in the private key
+    privateKey: process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
+    clientId: process.env.FIREBASE_CLIENT_ID!,
+    authUri: "https://accounts.google.com/o/oauth2/auth",
+    tokenUri: "https://oauth2.googleapis.com/token",
+    authProviderX509CertUrl: "https://www.googleapis.com/oauth2/v1/certs",
+    clientX509CertUrl: `https://www.googleapis.com/robot/v1/metadata/x509/${process.env.FIREBASE_CLIENT_EMAIL!.replace('@', '%40')}`,
+    universeDomain: "googleapis.com"
+  };
+  console.log('✅ Loaded Firebase credentials from environment variables');
+}
 
 // Initialize Firebase Admin SDK (only once)
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${serviceAccount.projectId}.appspot.com`
   });
   
   console.log('✅ Firebase Admin SDK initialized successfully');
-  console.log(`   Project: ${process.env.FIREBASE_PROJECT_ID}`);
-  console.log(`   Storage Bucket: ${process.env.FIREBASE_STORAGE_BUCKET}`);
+  console.log(`   Project: ${serviceAccount.projectId}`);
+  console.log(`   Storage Bucket: ${process.env.FIREBASE_STORAGE_BUCKET || `${serviceAccount.projectId}.appspot.com`}`);
 }
 
 // Export Firebase services for use throughout the application
 export const auth = admin.auth();
 export const db = admin.firestore();
 export const storage = admin.storage();
-// Get bucket with explicit name from environment variable
-export const bucket = storage.bucket(process.env.FIREBASE_STORAGE_BUCKET);
+// Get bucket with explicit name from environment variable or use default
+const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || `${serviceAccount.projectId}.appspot.com`;
+export const bucket = storage.bucket(storageBucket);
 
 // Verify bucket exists on startup
 bucket.exists()
   .then(([exists]) => {
     if (exists) {
-      console.log(`✅ Storage bucket verified: ${process.env.FIREBASE_STORAGE_BUCKET}`);
+      console.log(`✅ Storage bucket verified: ${storageBucket}`);
     } else {
-      console.error(`❌ Storage bucket does NOT exist: ${process.env.FIREBASE_STORAGE_BUCKET}`);
+      console.error(`❌ Storage bucket does NOT exist: ${storageBucket}`);
       console.error('Please create the bucket in Firebase Console: https://console.firebase.google.com/project/photopin-d0d05/storage');
     }
   })

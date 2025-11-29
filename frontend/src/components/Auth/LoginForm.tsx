@@ -76,18 +76,18 @@ export const LoginForm: React.FC = () => {
                   },
                   backgroundColor: 'rgba(255, 122, 51, 0.08)', // Light orange background when focused
                 },
-                // Override browser autofill styles with darker background
+                // Override browser autofill styles with light orange background
                 '& input:-webkit-autofill': {
-                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.8) inset !important',
-                  WebkitTextFillColor: 'rgba(255, 255, 255, 0.87) !important',
-                  caretColor: 'rgba(255, 255, 255, 0.87) !important',
+                  WebkitBoxShadow: '0 0 0 100px #fff5f0 inset !important',
+                  WebkitTextFillColor: '#ff8c5a !important',
+                  caretColor: '#ff8c5a !important',
                   transition: 'background-color 5000s ease-in-out 0s', // Prevent color change
                 },
                 '& input:-webkit-autofill:hover': {
-                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.9) inset !important',
+                  WebkitBoxShadow: '0 0 0 100px #fff5f0 inset !important',
                 },
                 '& input:-webkit-autofill:focus': {
-                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.95) inset !important',
+                  WebkitBoxShadow: '0 0 0 100px #fff5f0 inset !important',
                 },
               },
               '& .MuiInputLabel-root.Mui-focused': {
@@ -114,18 +114,18 @@ export const LoginForm: React.FC = () => {
                   },
                   backgroundColor: 'rgba(255, 122, 51, 0.08)', // Light orange background when focused
                 },
-                // Override browser autofill styles with darker background
+                // Override browser autofill styles with light orange background
                 '& input:-webkit-autofill': {
-                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.8) inset !important',
-                  WebkitTextFillColor: 'rgba(255, 255, 255, 0.87) !important',
-                  caretColor: 'rgba(255, 255, 255, 0.87) !important',
+                  WebkitBoxShadow: '0 0 0 100px #fff5f0 inset !important',
+                  WebkitTextFillColor: '#ff8c5a !important',
+                  caretColor: '#ff8c5a !important',
                   transition: 'background-color 5000s ease-in-out 0s', // Prevent color change
                 },
                 '& input:-webkit-autofill:hover': {
-                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.9) inset !important',
+                  WebkitBoxShadow: '0 0 0 100px #fff5f0 inset !important',
                 },
                 '& input:-webkit-autofill:focus': {
-                  WebkitBoxShadow: '0 0 0 100px rgba(30, 30, 30, 0.95) inset !important',
+                  WebkitBoxShadow: '0 0 0 100px #fff5f0 inset !important',
                 },
               },
               '& .MuiInputLabel-root.Mui-focused': {
