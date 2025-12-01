@@ -84,7 +84,7 @@ CORS_ORIGIN=http://localhost:3000
 
 # Firebase Configuration
 FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_STORAGE_BUCKET=your-project-id.firebasestorage.app
+FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
 
 # Google Maps API Key
 GOOGLE_MAPS_API_KEY=your-google-maps-api-key
@@ -120,7 +120,7 @@ REACT_APP_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 REACT_APP_FIREBASE_API_KEY=your-firebase-api-key
 REACT_APP_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
 REACT_APP_FIREBASE_PROJECT_ID=your-project-id
-REACT_APP_FIREBASE_STORAGE_BUCKET=your-project-id.firebasestorage.app
+REACT_APP_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
 REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
 REACT_APP_FIREBASE_APP_ID=your-app-id
 ```
@@ -175,7 +175,7 @@ firebase deploy --only storage
 ```json
 "storage": [
   {
-    "bucket": "your-project-id.firebasestorage.app",
+    "bucket": "your-project-id.appspot.com",
     "rules": "storage.rules"
   }
 ]
@@ -485,7 +485,7 @@ Frontend should run on `http://localhost:3000`
      REACT_APP_FIREBASE_API_KEY=your-firebase-api-key
      REACT_APP_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
      REACT_APP_FIREBASE_PROJECT_ID=your-project-id
-     REACT_APP_FIREBASE_STORAGE_BUCKET=your-project-id.firebasestorage.app
+     REACT_APP_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
      REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
      REACT_APP_FIREBASE_APP_ID=your-app-id
      ```
@@ -598,7 +598,7 @@ Frontend should run on `http://localhost:3000`
      PORT=5000
      CORS_ORIGIN=https://your-frontend-url.vercel.app,http://localhost:3000
      FIREBASE_PROJECT_ID=your-project-id
-     FIREBASE_STORAGE_BUCKET=your-project-id.firebasestorage.app
+     FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
      GOOGLE_MAPS_API_KEY=your-google-maps-api-key
      GOOGLE_PHOTOS_CLIENT_ID=your-google-photos-client-id
      GOOGLE_PHOTOS_CLIENT_SECRET=your-google-photos-client-secret
