@@ -359,4 +359,91 @@ export class PhotoController {
       });
     }
   }
+
+  // Bulk update photos (tags, etc.)
+  // Bulk update photos endpoint: POST /api/photos/bulk-update
+  // Updates multiple photos with tags (add/remove) and/or location (set/clear)
+  static async bulkUpdatePhotos(req: Request, res: Response) {
+    try {
+      const { user } = req as AuthenticatedRequest;
+      const { photoIds, tagsToAdd, tagsToRemove, location } = req.body;
+
+      // Validate photoIds array is provided and not empty
+      if (!photoIds || !Array.isArray(photoIds) || photoIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'photoIds array is required and must not be empty'
+        });
+      }
+
+      // Validate that at least one update operation is specified
+      if (!tagsToAdd && !tagsToRemove && location === undefined) {
+        return res.status(400).json({
+          success: false,
+          error: 'At least one update operation (tagsToAdd, tagsToRemove, or location) is required'
+        });
+      }
+
+      // Service handles ownership verification and error handling per photo
+      const result = await photoService.bulkUpdatePhotos(photoIds, user.uid, {
+        tagsToAdd,
+        tagsToRemove,
+        location
+      });
+
+      if (result.error) {
+        return res.status(500).json({ success: false, error: result.error });
+      }
+
+      res.json({
+        success: result.success,
+        updated: result.updated,
+        ...(result.errors && result.errors.length > 0 && { errors: result.errors })
+      });
+
+    } catch (error: any) {
+      console.error('Bulk update photos error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
+
+  // Bulk delete photos
+  static async bulkDeletePhotos(req: Request, res: Response) {
+    try {
+      // Get authenticated user and request body
+      const { user } = req as AuthenticatedRequest;
+      const { photoIds } = req.body;
+
+      // Validate photoIds
+      if (!photoIds || !Array.isArray(photoIds) || photoIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'photoIds array is required and must not be empty'
+        });
+      }
+
+      // Bulk delete photos using service
+      const result = await photoService.bulkDeletePhotos(photoIds, user.uid);
+
+      if (result.error) {
+        return res.status(500).json({ success: false, error: result.error });
+      }
+
+      res.json({
+        success: result.success,
+        deleted: result.deleted,
+        ...(result.errors && result.errors.length > 0 && { errors: result.errors })
+      });
+
+    } catch (error: any) {
+      console.error('Bulk delete photos error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  }
 }

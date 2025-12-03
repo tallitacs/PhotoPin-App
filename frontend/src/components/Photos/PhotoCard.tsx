@@ -4,36 +4,52 @@ import {
   Typography,
   IconButton,
   Box,
-  Chip
+  Chip,
+  Checkbox
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import FavoriteIcon from '@mui/icons-material/Favorite';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import CheckIcon from '@mui/icons-material/Check';
 import StarIcon from '@mui/icons-material/Star';
 import { Photo } from '../../types/photo.types';
 import { format } from 'date-fns';
 
+// Props for PhotoCard component
 interface PhotoCardProps {
-  photo: Photo;
-  onDelete?: (photoId: string) => void;
-  onClick?: (photo: Photo) => void;
-  onEdit?: (photo: Photo) => void;
-  onSetCover?: (photo: Photo) => void;
-  isCover?: boolean;
+  photo: Photo; // The photo data to display
+  onDelete?: (photoId: string) => void; // Callback when photo is deleted
+  onClick?: (photo: Photo) => void; // Callback when photo card is clicked (opens photo viewer)
+  onEdit?: (photo: Photo) => void; // Callback when photo is edited
+  onSetCover?: (photo: Photo) => void; // Callback to set photo as album cover
+  isCover?: boolean; // Whether this photo is the album cover
+  isSelected?: boolean; // Whether this photo is currently selected
+  onSelect?: (photoId: string, selected: boolean) => void; // Callback when photo selection is toggled
+  selectionMode?: boolean; // Whether selection mode is active
+  onFavoriteToggle?: (photo: Photo) => void; // Callback when favorite status is toggled
+  onToggleSelectionMode?: () => void; // Callback to enter selection mode (triggered by checkmark button)
 }
 
+// PhotoCard: Displays photo with action buttons (hover), selection checkbox, and metadata overlay
+// Supports normal mode (click to view) and selection mode (click to select)
 export const PhotoCard: React.FC<PhotoCardProps> = ({ 
   photo, 
   onDelete, 
   onClick,
   onEdit,
   onSetCover,
-  isCover
+  isCover,
+  isSelected = false,
+  onSelect,
+  selectionMode = false,
+  onFavoriteToggle,
+  onToggleSelectionMode
 }) => {
-  const [showOverlay, setShowOverlay] = React.useState(false);
+  const [showOverlay, setShowOverlay] = React.useState(false); // Controls visibility of action buttons (shown on hover)
   
-  // Calculate aspect ratio
+  // Calculate aspect ratio for proper image display
   const width = photo.metadata?.width || 1;
   const height = photo.metadata?.height || 1;
   const aspectRatio = width / height;
@@ -79,14 +95,26 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
       onMouseLeave={() => setShowOverlay(false)}
     >
       <Box
-        onClick={() => onClick?.(photo)}
+        onClick={(e) => {
+          if (selectionMode && onSelect) {
+            e.stopPropagation();
+            onSelect(photo.id, !isSelected);
+          } else {
+            onClick?.(photo);
+          }
+        }}
         sx={{
           width: '100%',
           height: '100%', // Fill parent container height
           position: 'relative',
           backgroundColor: 'transparent',
           overflow: 'hidden',
-          cursor: onClick ? 'pointer' : 'default'
+          cursor: selectionMode ? 'pointer' : (onClick ? 'pointer' : 'default'),
+          opacity: isSelected ? 0.7 : 1,
+          border: isSelected ? '3px solid' : '3px solid transparent',
+          borderColor: isSelected ? 'primary.main' : 'transparent',
+          borderRadius: 1,
+          zIndex: 1 // Ensure proper stacking context
         }}
       >
         <Box
@@ -109,20 +137,171 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
           }}
         />
         
-        {/* Favorite indicator */}
-        {photo.isFavorite && (
-          <FavoriteIcon
+        {/* Circular Action Buttons Row - positioned at top right */}
+        {!selectionMode && (onToggleSelectionMode || onFavoriteToggle || onEdit || onDelete) && (
+          <Box
+            className="photo-actions"
             sx={{
               position: 'absolute',
               top: 8,
               right: 8,
-              color: '#ff1744',
-              fontSize: '1.2rem',
-              filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))',
-              zIndex: 3,
-              pointerEvents: 'none'
+              display: 'flex',
+              gap: 1,
+              opacity: showOverlay ? 1 : 0, // Only visible on hover
+              transition: 'opacity 0.2s',
+              pointerEvents: 'auto', // Always allow clicks
+              zIndex: 20 // Higher z-index to ensure it's above other elements
             }}
-          />
+          >
+            {/* Select Button - circular with checkmark */}
+            {onToggleSelectionMode && (
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onToggleSelectionMode();
+                }}
+                sx={(theme) => ({
+                  backgroundColor: theme.palette.mode === 'dark'
+                    ? 'rgba(255, 78, 0, 0.6)'
+                    : 'rgba(255, 78, 0, 0.6)',
+                  color: '#ffffff',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  pointerEvents: 'auto', // Ensure button is always clickable
+                  '&:hover': {
+                    backgroundColor: theme.palette.mode === 'dark'
+                      ? 'rgba(255, 78, 0, 0.8)'
+                      : 'rgba(255, 78, 0, 0.8)',
+                    transform: 'scale(1.1)'
+                  }
+                })}
+                title="Select photo"
+              >
+                <CheckIcon fontSize="small" />
+              </IconButton>
+            )}
+
+            {/* Favorite Button */}
+            {onFavoriteToggle && (
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onFavoriteToggle(photo);
+                }}
+                sx={(theme) => ({
+                  backgroundColor: photo.isFavorite
+                    ? (theme.palette.mode === 'dark' ? 'rgba(255, 23, 68, 0.6)' : 'rgba(255, 23, 68, 0.6)')
+                    : (theme.palette.mode === 'dark' ? 'rgba(255, 78, 0, 0.6)' : 'rgba(255, 78, 0, 0.6)'),
+                  color: '#ffffff',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  '&:hover': {
+                    backgroundColor: photo.isFavorite
+                      ? (theme.palette.mode === 'dark' ? 'rgba(255, 23, 68, 0.8)' : 'rgba(255, 23, 68, 0.8)')
+                      : (theme.palette.mode === 'dark' ? 'rgba(255, 78, 0, 0.8)' : 'rgba(255, 78, 0, 0.8)'),
+                    transform: 'scale(1.1)'
+                  }
+                })}
+                title={photo.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              >
+                {photo.isFavorite ? (
+                  <FavoriteIcon fontSize="small" />
+                ) : (
+                  <FavoriteBorderIcon fontSize="small" />
+                )}
+              </IconButton>
+            )}
+
+            {/* Edit Button */}
+            {onEdit && (
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(photo);
+                }}
+                sx={(theme) => ({
+                  backgroundColor: theme.palette.mode === 'dark'
+                    ? 'rgba(255, 78, 0, 0.6)'
+                    : 'rgba(255, 78, 0, 0.6)',
+                  color: '#ffffff',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  '&:hover': {
+                    backgroundColor: theme.palette.mode === 'dark'
+                      ? 'rgba(255, 78, 0, 0.8)'
+                      : 'rgba(255, 78, 0, 0.8)',
+                    transform: 'scale(1.1)'
+                  }
+                })}
+                title="Edit photo"
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            )}
+
+            {/* Delete Button */}
+            {onDelete && (
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(photo.id);
+                }}
+                sx={(theme) => ({
+                  backgroundColor: theme.palette.mode === 'dark'
+                    ? 'rgba(211, 47, 47, 0.6)'
+                    : 'rgba(211, 47, 47, 0.6)',
+                  color: '#ffffff',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  '&:hover': {
+                    backgroundColor: theme.palette.mode === 'dark'
+                      ? 'rgba(211, 47, 47, 0.8)'
+                      : 'rgba(211, 47, 47, 0.8)',
+                    transform: 'scale(1.1)'
+                  }
+                })}
+                title="Delete photo"
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            )}
+          </Box>
+        )}
+
+        {/* Selection checkmark - shown in selection mode when selected */}
+        {selectionMode && isSelected && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              backgroundColor: 'primary.main',
+              borderRadius: '50%',
+              width: 24,
+              height: 24,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              zIndex: 4,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+            }}
+          >
+            <CheckIcon sx={{ fontSize: '16px' }} />
+          </Box>
         )}
 
         {/* Overlay with metadata - always visible, bottom */}
@@ -218,74 +397,45 @@ export const PhotoCard: React.FC<PhotoCardProps> = ({
           </Box>
         </Box>
 
-        {/* Action buttons - show on hover */}
-        {(onEdit || onDelete || onSetCover) && (
+        {/* Set Cover Button - shown in album views */}
+        {onSetCover && !selectionMode && (
           <Box
-            className="photo-actions"
             sx={{
               position: 'absolute',
               top: 8,
               right: 8,
-              display: 'flex',
-              gap: 0.5,
+              zIndex: 4,
               opacity: showOverlay ? 1 : 0,
               transition: 'opacity 0.2s',
               pointerEvents: 'auto'
             }}
           >
-            {onSetCover && (
-              <IconButton 
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSetCover(photo);
-                }}
-                sx={{
-                  backgroundColor: isCover ? 'primary.main' : 'rgba(255, 255, 255, 0.9)',
-                  color: isCover ? 'white' : 'inherit',
-                  '&:hover': {
-                    backgroundColor: isCover ? 'primary.dark' : 'rgba(255, 255, 255, 1)'
-                  }
-                }}
-                title={isCover ? 'Cover photo' : 'Set as cover'}
-              >
-                <StarIcon fontSize="small" />
-              </IconButton>
-            )}
-            {onEdit && (
-              <IconButton 
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(photo);
-                }}
-                sx={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 1)'
-                  }
-                }}
-              >
-                <EditIcon fontSize="small" />
-              </IconButton>
-            )}
-            {onDelete && (
-              <IconButton 
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(photo.id);
-                }}
-                sx={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 1)'
-                  }
-                }}
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            )}
+            <IconButton 
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSetCover(photo);
+              }}
+              sx={(theme) => ({
+                backgroundColor: isCover
+                  ? (theme.palette.mode === 'dark' ? '#ff8c5a' : 'rgba(255, 140, 90, 0.95)')
+                  : (theme.palette.mode === 'dark' ? 'rgba(255, 140, 90, 0.9)' : 'rgba(255, 140, 90, 0.95)'),
+                color: isCover ? '#121212' : (theme.palette.mode === 'dark' ? '#121212' : '#ffffff'),
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                '&:hover': {
+                  backgroundColor: isCover
+                    ? (theme.palette.mode === 'dark' ? '#ffa366' : 'rgba(255, 140, 90, 1)')
+                    : (theme.palette.mode === 'dark' ? 'rgba(255, 140, 90, 1)' : 'rgba(255, 140, 90, 1)'),
+                  transform: 'scale(1.1)'
+                }
+              })}
+              title={isCover ? 'Cover photo' : 'Set as cover'}
+            >
+              <StarIcon fontSize="small" />
+            </IconButton>
           </Box>
         )}
       </Box>

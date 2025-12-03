@@ -32,7 +32,7 @@ export class PhotoService {
 
       // Extract EXIF metadata (GPS, camera info, date taken, etc.)
       const metadata = await PhotoMetadataUtil.extractMetadata(file.buffer, file.originalname);
-      
+
       // Ensure takenAt is always set (required for queries)
       if (!metadata.takenAt) {
         metadata.takenAt = new Date().toISOString();
@@ -46,6 +46,7 @@ export class PhotoService {
       const thumbnailBuffer = await PhotoMetadataUtil.generateThumbnail(file.buffer);
 
       // Upload original photo
+      console.log(`📤 Uploading to bucket: ${bucket.name}, path: ${storagePath}`);
       const fileRef = bucket.file(storagePath);
       await fileRef.save(file.buffer, {
         metadata: {
@@ -106,7 +107,7 @@ export class PhotoService {
         try {
           const tripRef = db.collection('trips').doc(tripId);
           const tripDoc = await tripRef.get();
-          
+
           if (tripDoc.exists) {
             const trip = tripDoc.data();
             if (trip && trip.userId === userId) {
@@ -132,8 +133,14 @@ export class PhotoService {
       console.error('Error details:', {
         message: error.message,
         code: error.code,
-        stack: error.stack
+        stack: error.stack,
+        bucketName: bucket.name
       });
+      // If it's a bucket error, include more details
+      if (error.code === 404 || error.message?.includes('bucket')) {
+        console.error(`❌ Bucket issue - Current bucket name: ${bucket.name}`);
+        console.error(`   Expected bucket: photopin-d0d05.firebasestorage.app`);
+      }
       return { error: error.message || 'Failed to upload photo' };
     }
   }
@@ -269,7 +276,7 @@ export class PhotoService {
           allowedUpdates.metadata.gps = null;
         }
       }
-      
+
       // Update location if provided (for reverse geocoded location info)
       // Allow setting location to null to clear it, or updating with address/city/country without GPS
       if (updates.location !== undefined) {
@@ -345,12 +352,12 @@ export class PhotoService {
 
       // Regenerate thumbnail with rotation
       const thumbnailBuffer = await PhotoMetadataUtil.generateThumbnail(rotatedBuffer);
-      
+
       // Extract thumbnail path from thumbnailUrl
-      const thumbnailPath = photo.thumbnailUrl 
+      const thumbnailPath = photo.thumbnailUrl
         ? photo.thumbnailUrl.split('/').slice(-2).join('/') // Get last 2 parts (thumbnails/filename)
         : photo.storagePath.replace('photos', 'thumbnails').replace(/\.[^.]+$/, '_thumb.jpg');
-      
+
       const thumbnailRef = bucket.file(thumbnailPath);
       await thumbnailRef.save(thumbnailBuffer, {
         metadata: {
@@ -362,7 +369,7 @@ export class PhotoService {
           }
         }
       });
-      
+
       // Make thumbnail public
       await thumbnailRef.makePublic();
 
@@ -454,11 +461,11 @@ export class PhotoService {
       // Filter to include photos with GPS coordinates OR location address data
       snapshot.forEach((doc) => {
         const photo = doc.data() as Photo;
-        
+
         // Debug logging
         const hasGPS = !!(photo.metadata?.gps?.latitude && photo.metadata?.gps?.longitude);
         const hasLocation = !!(photo.location && (photo.location.address || photo.location.city || photo.location.country));
-        
+
         if (hasGPS) {
           console.log(`Photo ${photo.id} has GPS:`, photo.metadata?.gps);
           photos.push(photo);
@@ -563,6 +570,124 @@ export class PhotoService {
     } catch (error: any) {
       console.error('Get timeline error:', error);
       return { error: error.message || 'Failed to retrieve timeline' };
+    }
+  }
+
+  // Bulk update photos (tags, etc.)
+  // Bulk update multiple photos with tags and/or location
+  // Processes photos sequentially, verifying existence and ownership for each
+  async bulkUpdatePhotos(photoIds: string[], userId: string, updates: {
+    tagsToAdd?: string[],
+    tagsToRemove?: string[],
+    location?: { latitude?: number, longitude?: number, city?: string, country?: string, address?: string } | null
+  }): Promise<{ success: boolean, updated: number, errors?: Array<{ photoId: string, error: string }>, error?: string }> {
+    try {
+      const errors: Array<{ photoId: string, error: string }> = [];
+      let updatedCount = 0;
+
+      // Process each photo sequentially for proper error handling and ownership verification
+      for (const photoId of photoIds) {
+        try {
+          const doc = await this.photosCollection.doc(photoId).get();
+
+          if (!doc.exists) {
+            errors.push({ photoId, error: 'Photo not found' });
+            continue;
+          }
+
+          const photo = doc.data() as Photo;
+
+          // Verify user owns this photo (security check)
+          if (photo.userId !== userId) {
+            errors.push({ photoId, error: 'Access denied' });
+            continue;
+          }
+
+          const updateData: any = {
+            updatedAt: new Date().toISOString()
+          };
+
+          // Handle tag updates (add and/or remove)
+          if (updates.tagsToAdd || updates.tagsToRemove) {
+            const currentTags = photo.tags || [];
+            let newTags = [...currentTags];
+
+            // Add new tags (avoid duplicates)
+            if (updates.tagsToAdd) {
+              updates.tagsToAdd.forEach(tag => {
+                if (!newTags.includes(tag)) {
+                  newTags.push(tag);
+                }
+              });
+            }
+
+            // Remove specified tags
+            if (updates.tagsToRemove) {
+              newTags = newTags.filter(tag => !updates.tagsToRemove!.includes(tag));
+            }
+
+            updateData.tags = newTags;
+          }
+
+          // Handle location update (set new location or clear if null)
+          if (updates.location !== undefined) {
+            if (updates.location === null) {
+              updateData.location = null;
+            } else {
+              updateData.location = updates.location;
+            }
+          }
+
+          await this.photosCollection.doc(photoId).update(updateData);
+          updatedCount++;
+        } catch (error: any) {
+          console.error(`Error updating photo ${photoId}:`, error);
+          errors.push({ photoId, error: error.message || 'Failed to update photo' });
+        }
+      }
+
+      return {
+        success: errors.length === 0,
+        updated: updatedCount,
+        ...(errors.length > 0 && { errors })
+      };
+    } catch (error: any) {
+      console.error('Bulk update photos error:', error);
+      return { success: false, updated: 0, error: error.message || 'Failed to bulk update photos' };
+    }
+  }
+
+  // Bulk delete photos
+  async bulkDeletePhotos(photoIds: string[], userId: string): Promise<{ success: boolean, deleted: number, errors?: Array<{ photoId: string, error: string }>, error?: string }> {
+    try {
+      const errors: Array<{ photoId: string, error: string }> = [];
+      let deletedCount = 0;
+
+      // Process each photo
+      for (const photoId of photoIds) {
+        try {
+          // Use existing deletePhoto method which handles ownership and file deletion
+          const result = await this.deletePhoto(photoId, userId);
+
+          if (result.success) {
+            deletedCount++;
+          } else {
+            errors.push({ photoId, error: result.error || 'Failed to delete photo' });
+          }
+        } catch (error: any) {
+          console.error(`Error deleting photo ${photoId}:`, error);
+          errors.push({ photoId, error: error.message || 'Failed to delete photo' });
+        }
+      }
+
+      return {
+        success: errors.length === 0,
+        deleted: deletedCount,
+        ...(errors.length > 0 && { errors })
+      };
+    } catch (error: any) {
+      console.error('Bulk delete photos error:', error);
+      return { success: false, deleted: 0, error: error.message || 'Failed to bulk delete photos' };
     }
   }
 }

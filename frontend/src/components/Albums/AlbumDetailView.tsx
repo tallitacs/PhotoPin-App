@@ -505,12 +505,23 @@ export const AlbumDetailView: React.FC = () => {
     setViewerOpen(true);
   };
 
-  const handleFavoriteToggle = (updatedPhoto: Photo) => {
-    setPhotos(prevPhotos =>
-      prevPhotos.map(p => p.id === updatedPhoto.id ? updatedPhoto : p)
-    );
-    if (viewingPhoto && viewingPhoto.id === updatedPhoto.id) {
-      setViewingPhoto(updatedPhoto);
+  const handleFavoriteToggle = async (photo: Photo) => {
+    try {
+      const response = await api.updatePhoto(photo.id, {
+        isFavorite: !photo.isFavorite
+      });
+      if (response.success && response.photo) {
+        const updatedPhoto = response.photo;
+        setPhotos(prevPhotos =>
+          prevPhotos.map(p => p.id === updatedPhoto.id ? updatedPhoto : p)
+        );
+        if (viewingPhoto && viewingPhoto.id === updatedPhoto.id) {
+          setViewingPhoto(updatedPhoto);
+        }
+      }
+    } catch (err: any) {
+      console.error('Failed to toggle favorite:', err);
+      alert('Failed to update favorite status');
     }
   };
 
@@ -1027,6 +1038,10 @@ export const AlbumDetailView: React.FC = () => {
                 onSetCover={handleSetCover}
                 isCover={album?.coverPhotoUrl === (photo.thumbnailUrl || photo.url)}
                 onClick={handlePhotoClick}
+                onFavoriteToggle={handleFavoriteToggle}
+                onToggleSelectionMode={() => {
+                  // Optional: can add selection mode to albums if needed
+                }}
               />
             </Box>
           ))}

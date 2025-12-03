@@ -61,7 +61,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       }),
       ...(mode === 'light' && {
         background: {
-          default: '#f4f6f8',
+          default: '#fafafa',
           paper: '#ffffff',
         },
         text: {
@@ -72,6 +72,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     },
     typography: {
       fontFamily: [
+        '"Noto Sans"',
         '-apple-system',
         'BlinkMacSystemFont',
         '"Segoe UI"',

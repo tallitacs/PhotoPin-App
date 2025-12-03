@@ -64,20 +64,21 @@ try {
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${serviceAccount.projectId}.appspot.com`
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${serviceAccount.projectId}.firebasestorage.app`
   });
-  
+
   console.log('✅ Firebase Admin SDK initialized successfully');
   console.log(`   Project: ${serviceAccount.projectId}`);
-  console.log(`   Storage Bucket: ${process.env.FIREBASE_STORAGE_BUCKET || `${serviceAccount.projectId}.appspot.com`}`);
+  console.log(`   Storage Bucket: ${process.env.FIREBASE_STORAGE_BUCKET || `${serviceAccount.projectId}.firebasestorage.app`}`);
 }
 
 // Export Firebase services for use throughout the application
 export const auth = admin.auth();
 export const db = admin.firestore();
 export const storage = admin.storage();
-// Get bucket with explicit name from environment variable or use default
-const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || `${serviceAccount.projectId}.appspot.com`;
+// Get bucket with explicit name from environment variable or use default (firebasestorage.app format)
+const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || `${serviceAccount.projectId}.firebasestorage.app`;
+console.log(`📦 Using storage bucket: ${storageBucket}`);
 export const bucket = storage.bucket(storageBucket);
 
 // Verify bucket exists on startup
@@ -107,13 +108,13 @@ export const testConnection = async (): Promise<boolean> => {
   try {
     // Test Firestore connection
     await db.collection('_connection_test').limit(1).get();
-    
+
     // Test Storage connection
     await bucket.exists();
-    
+
     // Test Auth connection
     await auth.listUsers(1);
-    
+
     console.log('✅ All Firebase services are accessible');
     return true;
   } catch (error) {

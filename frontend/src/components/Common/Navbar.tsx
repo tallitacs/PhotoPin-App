@@ -2,9 +2,9 @@ import { AppBar, Toolbar, Typography, Button, Box, IconButton, Tooltip } from '@
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useThemeMode } from '../../hooks/useTheme';
-import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
+import FavoriteIcon from '@mui/icons-material/Favorite';
 
 export const Navbar: React.FC = () => {
   const { logout, user } = useAuth();
@@ -12,7 +12,10 @@ export const Navbar: React.FC = () => {
   const navigate = useNavigate();
 
   const handleLogoClick = () => {
-    navigate('/');
+    // Dispatch event to close map sidebar if open
+    window.dispatchEvent(new CustomEvent('closeMapSidebar'));
+    // Navigate to home page
+    navigate('/', { replace: true });
   };
 
   return (
@@ -30,10 +33,15 @@ export const Navbar: React.FC = () => {
           }}
           onClick={handleLogoClick}
         >
-          <PhotoCameraIcon sx={{ mr: 1 }} />
-          <Typography variant="h6" component="div">
-            PhotoPin
-          </Typography>
+          <Box
+            component="img"
+            src="/icons/PHOTOPIN LOGO _v2 white.png"
+            alt="PhotoPin Logo"
+            sx={{
+              height: '40px',
+              width: 'auto'
+            }}
+          />
         </Box>
         <Box sx={{ flexGrow: 1 }} />
 
@@ -50,15 +58,15 @@ export const Navbar: React.FC = () => {
           <Button component={RouterLink} to="/memories" color="inherit">
             Memories
           </Button>
-          <Button component={RouterLink} to="/upload" color="inherit">
-            Upload
+          <Button component={RouterLink} to="/favorites" color="inherit">
+            <FavoriteIcon />
           </Button>
           {/* NEW: Import Button */}
           <Button component={RouterLink} to="/import" color="inherit">
             Import
           </Button>
         </Box>
-        
+
         <Box sx={{ flexGrow: 1 }} />
 
         {/* Theme Toggle */}
@@ -73,7 +81,7 @@ export const Navbar: React.FC = () => {
           </IconButton>
         </Tooltip>
 
-        <Typography variant="body2" sx={{ mr: 2 }}>
+        <Typography variant="body2" sx={{ mr: 2, color: 'white' }}>
           {user?.email}
         </Typography>
         <Button color="inherit" onClick={logout}>

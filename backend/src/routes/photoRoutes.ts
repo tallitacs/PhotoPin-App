@@ -60,4 +60,13 @@ router.delete('/:photoId', (req: Request, res: Response) =>
   PhotoController.deletePhoto(req as AuthenticatedRequest, res)
 );
 
+// Bulk operations
+router.post('/bulk-update', (req: Request, res: Response) =>
+  PhotoController.bulkUpdatePhotos(req as AuthenticatedRequest, res)
+);
+
+router.post('/bulk-delete', (req: Request, res: Response) =>
+  PhotoController.bulkDeletePhotos(req as AuthenticatedRequest, res)
+);
+
 export default router;

@@ -149,6 +149,33 @@ export const rotatePhoto = async (photoId: string, angle: number) => {
   return data;
 };
 
+// Bulk update photos: updates multiple photos with tags (add/remove) and/or location (set/clear)
+// Returns: { success, updated, errors?, error? }
+export const bulkUpdatePhotos = async (photoIds: string[], updates: {
+  tagsToAdd?: string[],
+  tagsToRemove?: string[],
+  location?: { latitude?: number, longitude?: number, city?: string, country?: string, address?: string } | null
+}) => {
+  const { data } = await api.post<{
+    success: boolean,
+    updated?: number,
+    errors?: Array<{ photoId: string, error: string }>,
+    error?: string
+  }>('/photos/bulk-update', { photoIds, ...updates });
+  return data;
+};
+
+// Bulk delete photos
+export const bulkDeletePhotos = async (photoIds: string[]) => {
+  const { data } = await api.post<{
+    success: boolean,
+    deleted?: number,
+    errors?: Array<{ photoId: string, error: string }>,
+    error?: string
+  }>('/photos/bulk-delete', { photoIds });
+  return data;
+};
+
 // ==========================================
 // Trip API Endpoints
 // ==========================================

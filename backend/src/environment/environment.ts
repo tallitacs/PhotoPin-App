@@ -84,7 +84,7 @@ export const environment: Environment = {
     credentials: firebaseCredentials,
     projectId: firebaseCredentials.project_id,
     databaseURL: `https://${firebaseCredentials.project_id}.firebaseio.com`,
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${firebaseCredentials.project_id}.appspot.com`
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${firebaseCredentials.project_id}.firebasestorage.app`
   },
 
   // Google APIs configuration

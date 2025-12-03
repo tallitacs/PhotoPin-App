@@ -14,6 +14,7 @@ import { PhotoUpload } from './components/Photos/PhotoUpload';
 import { AlbumsView } from './components/Albums/AlbumsView';
 import { AlbumDetailView } from './components/Albums/AlbumDetailView';
 import { MemoriesView } from './components/Memories/MemoriesView';
+import { FavoritesView } from './components/Favorites/FavoritesView';
 // Google Photos components
 import { GooglePhotosImport } from './components/Import/GooglePhotosImport';
 import { GoogleCallback } from './components/Import/GoogleCallback';
@@ -101,6 +102,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <MemoriesView />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/favorites"
+            element={
+              <ProtectedRoute>
+                <FavoritesView />
               </ProtectedRoute>
             }
           />
