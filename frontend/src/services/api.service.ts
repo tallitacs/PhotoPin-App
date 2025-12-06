@@ -55,12 +55,12 @@ api.interceptors.response.use(
       message: error.message,
       baseURL: error.config?.baseURL
     });
-    
+
     // Log full error response for easier debugging
     if (error.response?.data) {
       console.error('Error response data:', JSON.stringify(error.response.data, null, 2));
     }
-    
+
     // Handle network errors specifically
     if (error.message === 'Network Error' || !error.response) {
       console.error('Network Error - Backend may not be running or CORS issue');
@@ -68,7 +68,7 @@ api.interceptors.response.use(
       console.error('Expected API URL:', process.env.REACT_APP_API_URL || 'http://localhost:5000/api (default)');
       error.message = 'Cannot connect to server. Make sure the backend is running on port 5000.';
     }
-    
+
     return Promise.reject(error);
   }
 );
@@ -86,7 +86,7 @@ export const uploadPhotos = async (files: File[], tripId?: string) => {
   });
 
   // Add tripId as query parameter if provided
-  const url = tripId 
+  const url = tripId
     ? `/photos/upload-multiple?tripId=${tripId}`
     : '/photos/upload-multiple';
 
@@ -121,9 +121,9 @@ export const getTimeline = async (): Promise<TimelineResponse> => {
 };
 
 // Update photo metadata (tags, tripId, metadata, etc.)
-export const updatePhoto = async (photoId: string, updates: { 
-  tags?: string[], 
-  metadata?: Partial<PhotoMetadata>, 
+export const updatePhoto = async (photoId: string, updates: {
+  tags?: string[],
+  metadata?: Partial<PhotoMetadata>,
   tripId?: string,
   displayName?: string,
   isFavorite?: boolean,
@@ -223,8 +223,15 @@ export const deleteTrip = async (tripId: string) => {
   return data;
 };
 
-// Auto-cluster photos into trips
-export const autoClusterPhotos = async (options?: { maxDistance?: number, maxTimeGap?: number, minPhotos?: number }) => {
+// Smart Albums: Auto-cluster photos into trips/albums
+export const autoClusterPhotos = async (options?: {
+  strategy?: 'location-time' | 'date-range' | 'location' | 'camera' | 'tags',
+  maxDistance?: number,
+  maxTimeGap?: number,
+  minPhotos?: number,
+  dateRangeDays?: number,
+  tagSimilarity?: number
+}) => {
   const { data } = await api.post<{
     success: boolean,
     message?: string,

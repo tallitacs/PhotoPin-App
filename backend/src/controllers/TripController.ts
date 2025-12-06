@@ -171,12 +171,22 @@ export class TripController {
         return res.status(401).json({ success: false, error: 'Unauthorized' });
       }
 
-      const { maxDistance = 50, maxTimeGap = 24, minPhotos = 3 } = req.body;
+      const {
+        strategy = 'location-time',
+        maxDistance = 50,
+        maxTimeGap = 24,
+        minPhotos = 3,
+        dateRangeDays = 7,
+        tagSimilarity = 2
+      } = req.body;
 
       const result = await tripService.autoClusterPhotos(req.user.uid, {
+        strategy,
         maxDistance,
         maxTimeGap,
-        minPhotos
+        minPhotos,
+        dateRangeDays,
+        tagSimilarity
       });
 
       if (result.error) {
@@ -185,7 +195,7 @@ export class TripController {
 
       res.json({
         success: true,
-        message: `Created ${result.trips?.length || 0} trips`,
+        message: `Created ${result.trips?.length || 0} smart albums`,
         trips: result.trips
       });
     } catch (error: unknown) {

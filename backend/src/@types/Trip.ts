@@ -43,7 +43,10 @@ export interface TripsResult {
 }
 
 export interface ClusterOptions {
-  maxDistance: number;
-  maxTimeGap: number;
-  minPhotos: number;
+  maxDistance?: number;
+  maxTimeGap?: number;
+  minPhotos?: number;
+  strategy?: 'location-time' | 'date-range' | 'location' | 'camera' | 'tags';
+  dateRangeDays?: number; // For date-range strategy: group photos within N days
+  tagSimilarity?: number; // For tags strategy: minimum number of common tags
 }

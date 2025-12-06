@@ -97,16 +97,16 @@ export class TripService {
         if (!a.startDate && !b.startDate) return 0;
         if (!a.startDate) return 1; // a goes to end
         if (!b.startDate) return -1; // b goes to end
-        
+
         // Both have startDate, parse them
         const dateA = new Date(a.startDate).getTime();
         const dateB = new Date(b.startDate).getTime();
-        
+
         // Handle invalid dates
         if (isNaN(dateA) && isNaN(dateB)) return 0;
         if (isNaN(dateA)) return 1;
         if (isNaN(dateB)) return -1;
-        
+
         return dateB - dateA; // Descending order (newest first)
       });
 
@@ -262,14 +262,23 @@ export class TripService {
     }
   }
 
-  // Auto-cluster photos into trips based on location and time proximity
+  // Smart Albums: Auto-cluster photos into trips based on different strategies
   async autoClusterPhotos(
     userId: string,
-    options: ClusterOptions = { maxDistance: 50, maxTimeGap: 24, minPhotos: 3 }
+    options: ClusterOptions = {
+      maxDistance: 50,
+      maxTimeGap: 24,
+      minPhotos: 3,
+      strategy: 'location-time',
+      dateRangeDays: 7,
+      tagSimilarity: 2
+    }
   ): Promise<TripsResult> {
     try {
-      // Get all photos with location data (GPS or location info) not in trips
-      // Query without orderBy to avoid index requirement (will sort client-side)
+      const strategy = options.strategy || 'location-time';
+      const minPhotos = options.minPhotos || 3;
+
+      // Get all photos not already in trips
       const snapshot = await this.photosCollection
         .where('userId', '==', userId)
         .get();
@@ -277,99 +286,49 @@ export class TripService {
       const photos: Photo[] = [];
       snapshot.forEach(doc => {
         const photo = doc.data() as Photo;
-        // Include photos with GPS or location info, and must have takenAt date
+        // Must have takenAt date and not be in a trip
         if (photo.metadata?.takenAt && !photo.tripId) {
-          const hasLocation = photo.metadata?.gps || 
-                            photo.location?.city || 
-                            photo.location?.country || 
-                            photo.location?.address;
-          if (hasLocation) {
-            photos.push(photo);
-          }
+          photos.push(photo);
         }
       });
 
-      // Sort by takenAt date ascending (client-side)
-      photos.sort((a, b) => {
-        const dateA = a.metadata?.takenAt ? new Date(a.metadata.takenAt).getTime() : 0;
-        const dateB = b.metadata?.takenAt ? new Date(b.metadata.takenAt).getTime() : 0;
-        return dateA - dateB; // Ascending order
-      });
-
-      console.log(`Found ${photos.length} photos with location data for clustering`);
-      
-      if (photos.length < options.minPhotos) {
-        console.log(`Not enough photos (${photos.length} < ${options.minPhotos}) to create clusters`);
+      if (photos.length < minPhotos) {
+        console.log(`Not enough photos (${photos.length} < ${minPhotos}) to create clusters`);
         return { trips: [] };
       }
 
-      // Cluster photos
-      const clusters: Photo[][] = [];
-      let currentCluster: Photo[] = [photos[0]];
+      let clusters: Photo[][];
 
-      for (let i = 1; i < photos.length; i++) {
-        const prevPhoto = photos[i - 1];
-        const currPhoto = photos[i];
-
-        // Skip if either photo doesn't have takenAt
-        if (!prevPhoto.metadata?.takenAt || !currPhoto.metadata?.takenAt) {
-          continue;
-        }
-
-        // Calculate time gap in hours
-        const timeGap = (new Date(currPhoto.metadata.takenAt).getTime() -
-          new Date(prevPhoto.metadata.takenAt).getTime()) / (1000 * 60 * 60);
-
-        // Check if photos are in the same location
-        let sameLocation = false;
-        
-        // If both have GPS, calculate distance
-        if (prevPhoto.metadata?.gps && currPhoto.metadata?.gps) {
-          const distance = PhotoMetadataUtil.calculateDistance(
-            prevPhoto.metadata.gps.latitude,
-            prevPhoto.metadata.gps.longitude,
-            currPhoto.metadata.gps.latitude,
-            currPhoto.metadata.gps.longitude
-          );
-          sameLocation = distance <= options.maxDistance;
-        } else {
-          // If no GPS, check if they have the same city or country
-          const prevCity = prevPhoto.location?.city?.toLowerCase();
-          const currCity = currPhoto.location?.city?.toLowerCase();
-          const prevCountry = prevPhoto.location?.country?.toLowerCase();
-          const currCountry = currPhoto.location?.country?.toLowerCase();
-          
-          // Same location if same city, or same country if no city
-          if (prevCity && currCity) {
-            sameLocation = prevCity === currCity;
-          } else if (prevCountry && currCountry && !prevCity && !currCity) {
-            sameLocation = prevCountry === currCountry;
-          }
-        }
-
-        // Add to cluster if same location and within time gap
-        if (sameLocation && timeGap <= options.maxTimeGap) {
-          currentCluster.push(currPhoto);
-        } else {
-          // Start new cluster
-          if (currentCluster.length >= options.minPhotos) {
-            clusters.push(currentCluster);
-          }
-          currentCluster = [currPhoto];
-        }
+      // Apply different clustering strategies
+      switch (strategy) {
+        case 'location-time':
+          clusters = this.clusterByLocationAndTime(photos, options);
+          break;
+        case 'date-range':
+          clusters = this.clusterByDateRange(photos, options);
+          break;
+        case 'location':
+          clusters = this.clusterByLocation(photos, options);
+          break;
+        case 'camera':
+          clusters = this.clusterByCamera(photos, options);
+          break;
+        case 'tags':
+          clusters = this.clusterByTags(photos, options);
+          break;
+        default:
+          clusters = this.clusterByLocationAndTime(photos, options);
       }
 
-      // Add final cluster
-      if (currentCluster.length >= options.minPhotos) {
-        clusters.push(currentCluster);
-      }
+      // Filter clusters by minimum photos
+      const validClusters = clusters.filter(cluster => cluster.length >= minPhotos);
 
-      console.log(`Created ${clusters.length} clusters from ${photos.length} photos`);
+      console.log(`Created ${validClusters.length} clusters from ${photos.length} photos using strategy: ${strategy}`);
 
-      // Create trips with better naming
+      // Create trips from clusters
       const createdTrips: Trip[] = [];
 
-      for (const cluster of clusters) {
+      for (const cluster of validClusters) {
         const startDate = cluster[0].metadata.takenAt!;
         const endDate = cluster[cluster.length - 1].metadata.takenAt!;
 
@@ -377,7 +336,7 @@ export class TripService {
 
         const result = await this.createTrip(userId, {
           name: tripName,
-          description: `Auto-generated trip with ${cluster.length} photos`,
+          description: `Smart album: ${cluster.length} photos (${strategy} clustering)`,
           photoIds: cluster.map(p => p.id),
           startDate,
           endDate
@@ -385,18 +344,247 @@ export class TripService {
 
         if (result.trip) {
           createdTrips.push(result.trip);
-          console.log(`Created trip: ${result.trip.name} with ${cluster.length} photos`);
+          console.log(`Created smart album: ${result.trip.name} with ${cluster.length} photos`);
         } else {
           console.warn(`Failed to create trip for cluster: ${result.error}`);
         }
       }
 
-      console.log(`Successfully created ${createdTrips.length} trips`);
+      console.log(`Successfully created ${createdTrips.length} smart albums`);
       return { trips: createdTrips };
     } catch (error: any) {
-      console.error('Auto-cluster error:', error);
-      return { error: error.message || 'Failed to auto-cluster photos' };
+      console.error('Smart albums clustering error:', error);
+      return { error: error.message || 'Failed to create smart albums' };
     }
+  }
+
+  // Cluster by location and time (original strategy)
+  private clusterByLocationAndTime(photos: Photo[], options: ClusterOptions): Photo[][] {
+    const maxDistance = options.maxDistance || 50;
+    const maxTimeGap = options.maxTimeGap || 24;
+    const minPhotos = options.minPhotos || 3;
+
+    // Sort by takenAt date ascending
+    const sortedPhotos = [...photos].sort((a, b) => {
+      const dateA = a.metadata?.takenAt ? new Date(a.metadata.takenAt).getTime() : 0;
+      const dateB = b.metadata?.takenAt ? new Date(b.metadata.takenAt).getTime() : 0;
+      return dateA - dateB;
+    });
+
+    const clusters: Photo[][] = [];
+    let currentCluster: Photo[] = [sortedPhotos[0]];
+
+    for (let i = 1; i < sortedPhotos.length; i++) {
+      const prevPhoto = sortedPhotos[i - 1];
+      const currPhoto = sortedPhotos[i];
+
+      if (!prevPhoto.metadata?.takenAt || !currPhoto.metadata?.takenAt) {
+        continue;
+      }
+
+      const timeGap = (new Date(currPhoto.metadata.takenAt).getTime() -
+        new Date(prevPhoto.metadata.takenAt).getTime()) / (1000 * 60 * 60);
+
+      let sameLocation = false;
+
+      if (prevPhoto.metadata?.gps && currPhoto.metadata?.gps) {
+        const distance = PhotoMetadataUtil.calculateDistance(
+          prevPhoto.metadata.gps.latitude,
+          prevPhoto.metadata.gps.longitude,
+          currPhoto.metadata.gps.latitude,
+          currPhoto.metadata.gps.longitude
+        );
+        sameLocation = distance <= maxDistance;
+      } else {
+        const prevCity = prevPhoto.location?.city?.toLowerCase();
+        const currCity = currPhoto.location?.city?.toLowerCase();
+        const prevCountry = prevPhoto.location?.country?.toLowerCase();
+        const currCountry = currPhoto.location?.country?.toLowerCase();
+
+        if (prevCity && currCity) {
+          sameLocation = prevCity === currCity;
+        } else if (prevCountry && currCountry && !prevCity && !currCity) {
+          sameLocation = prevCountry === currCountry;
+        }
+      }
+
+      if (sameLocation && timeGap <= maxTimeGap) {
+        currentCluster.push(currPhoto);
+      } else {
+        if (currentCluster.length >= minPhotos) {
+          clusters.push(currentCluster);
+        }
+        currentCluster = [currPhoto];
+      }
+    }
+
+    if (currentCluster.length >= minPhotos) {
+      clusters.push(currentCluster);
+    }
+
+    return clusters;
+  }
+
+  // Cluster by date range (events - same day/week)
+  private clusterByDateRange(photos: Photo[], options: ClusterOptions): Photo[][] {
+    const dateRangeDays = options.dateRangeDays || 7;
+    const minPhotos = options.minPhotos || 3;
+
+    // Sort by takenAt date
+    const sortedPhotos = [...photos].filter(p => p.metadata?.takenAt).sort((a, b) => {
+      const dateA = new Date(a.metadata!.takenAt!).getTime();
+      const dateB = new Date(b.metadata!.takenAt!).getTime();
+      return dateA - dateB;
+    });
+
+    const clusters: Photo[][] = [];
+    let currentCluster: Photo[] = [sortedPhotos[0]];
+
+    for (let i = 1; i < sortedPhotos.length; i++) {
+      const prevPhoto = sortedPhotos[i - 1];
+      const currPhoto = sortedPhotos[i];
+
+      const prevDate = new Date(prevPhoto.metadata!.takenAt!);
+      const currDate = new Date(currPhoto.metadata!.takenAt!);
+      const daysDiff = (currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24);
+
+      if (daysDiff <= dateRangeDays) {
+        currentCluster.push(currPhoto);
+      } else {
+        if (currentCluster.length >= minPhotos) {
+          clusters.push(currentCluster);
+        }
+        currentCluster = [currPhoto];
+      }
+    }
+
+    if (currentCluster.length >= minPhotos) {
+      clusters.push(currentCluster);
+    }
+
+    return clusters;
+  }
+
+  // Cluster by location only
+  private clusterByLocation(photos: Photo[], options: ClusterOptions): Photo[][] {
+    const maxDistance = options.maxDistance || 50;
+    const minPhotos = options.minPhotos || 3;
+
+    // Group photos by location
+    const locationGroups = new Map<string, Photo[]>();
+
+    photos.forEach(photo => {
+      if (!photo.metadata?.gps && !photo.location) return;
+
+      let locationKey = '';
+
+      if (photo.metadata?.gps) {
+        // Round coordinates to group nearby photos
+        const roundedLat = Math.round(photo.metadata.gps.latitude * 100) / 100;
+        const roundedLng = Math.round(photo.metadata.gps.longitude * 100) / 100;
+        locationKey = `gps:${roundedLat},${roundedLng}`;
+      } else if (photo.location) {
+        locationKey = `loc:${photo.location.city || photo.location.country || 'unknown'}`.toLowerCase();
+      }
+
+      if (locationKey) {
+        if (!locationGroups.has(locationKey)) {
+          locationGroups.set(locationKey, []);
+        }
+        locationGroups.get(locationKey)!.push(photo);
+      }
+    });
+
+    // Convert groups to clusters
+    const clusters: Photo[][] = [];
+    locationGroups.forEach((groupPhotos) => {
+      if (groupPhotos.length >= minPhotos) {
+        // Sort by date
+        groupPhotos.sort((a, b) => {
+          const dateA = a.metadata?.takenAt ? new Date(a.metadata.takenAt).getTime() : 0;
+          const dateB = b.metadata?.takenAt ? new Date(b.metadata.takenAt).getTime() : 0;
+          return dateA - dateB;
+        });
+        clusters.push(groupPhotos);
+      }
+    });
+
+    return clusters;
+  }
+
+  // Cluster by camera (same camera make/model)
+  private clusterByCamera(photos: Photo[], options: ClusterOptions): Photo[][] {
+    const minPhotos = options.minPhotos || 3;
+
+    // Group photos by camera
+    const cameraGroups = new Map<string, Photo[]>();
+
+    photos.forEach(photo => {
+      const cameraMake = photo.metadata?.cameraMake || 'Unknown';
+      const cameraModel = photo.metadata?.cameraModel || 'Unknown';
+      const cameraKey = `${cameraMake}|${cameraModel}`.toLowerCase();
+
+      if (!cameraGroups.has(cameraKey)) {
+        cameraGroups.set(cameraKey, []);
+      }
+      cameraGroups.get(cameraKey)!.push(photo);
+    });
+
+    // Convert groups to clusters
+    const clusters: Photo[][] = [];
+    cameraGroups.forEach((groupPhotos) => {
+      if (groupPhotos.length >= minPhotos) {
+        // Sort by date
+        groupPhotos.sort((a, b) => {
+          const dateA = a.metadata?.takenAt ? new Date(a.metadata.takenAt).getTime() : 0;
+          const dateB = b.metadata?.takenAt ? new Date(b.metadata.takenAt).getTime() : 0;
+          return dateA - dateB;
+        });
+        clusters.push(groupPhotos);
+      }
+    });
+
+    return clusters;
+  }
+
+  // Cluster by tags (photos with similar tags)
+  private clusterByTags(photos: Photo[], options: ClusterOptions): Photo[][] {
+    const tagSimilarity = options.tagSimilarity || 2;
+    const minPhotos = options.minPhotos || 3;
+
+    const clusters: Photo[][] = [];
+    const processed = new Set<string>();
+
+    photos.forEach(photo => {
+      if (processed.has(photo.id) || !photo.tags || photo.tags.length === 0) return;
+
+      const cluster: Photo[] = [photo];
+      processed.add(photo.id);
+
+      photos.forEach(otherPhoto => {
+        if (processed.has(otherPhoto.id) || !otherPhoto.tags || otherPhoto.tags.length === 0) return;
+
+        // Count common tags
+        const commonTags = photo.tags.filter(tag => otherPhoto.tags.includes(tag));
+
+        if (commonTags.length >= tagSimilarity) {
+          cluster.push(otherPhoto);
+          processed.add(otherPhoto.id);
+        }
+      });
+
+      if (cluster.length >= minPhotos) {
+        // Sort by date
+        cluster.sort((a, b) => {
+          const dateA = a.metadata?.takenAt ? new Date(a.metadata.takenAt).getTime() : 0;
+          const dateB = b.metadata?.takenAt ? new Date(b.metadata.takenAt).getTime() : 0;
+          return dateA - dateB;
+        });
+        clusters.push(cluster);
+      }
+    });
+
+    return clusters;
   }
 
   // Calculate trip location from photos
@@ -428,13 +616,13 @@ export class TripService {
     const firstPhoto = photos[0];
     const startDate = new Date(firstPhoto.metadata!.takenAt!);
     const endDate = new Date(photos[photos.length - 1].metadata!.takenAt!);
-    
+
     // Calculate duration in days
     const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    
+
     // Get location name
     let locationName = 'Unknown Location';
-    
+
     // Try to get location from photo's location field first
     if (firstPhoto.location?.city) {
       locationName = firstPhoto.location.city;
@@ -456,11 +644,11 @@ export class TripService {
         console.warn('Reverse geocoding failed:', error);
       }
     }
-    
+
     // Format date
-    const isSameMonth = startDate.getMonth() === endDate.getMonth() && 
-                       startDate.getFullYear() === endDate.getFullYear();
-    
+    const isSameMonth = startDate.getMonth() === endDate.getMonth() &&
+      startDate.getFullYear() === endDate.getFullYear();
+
     let dateStr = '';
     if (isSameMonth) {
       // Same month: "November 2017"
@@ -473,7 +661,7 @@ export class TripService {
         dateStr = `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
       }
     }
-    
+
     // Generate name based on duration
     if (daysDiff <= 3) {
       // Short trip: "Weekend in Galway" or "Day in Dublin"
