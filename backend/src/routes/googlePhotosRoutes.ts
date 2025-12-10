@@ -5,18 +5,20 @@ import { AuthenticatedRequest } from '../@types/express';
 
 const router = Router();
 
+// All Google Photos routes require authentication
 router.use(authenticateToken);
 
-// Get authorization URL
+// Get OAuth2 authorization URL for Google Photos
 router.get('/auth-url', (req: Request, res: Response) => {
   const url = googlePhotosService.getAuthUrl();
   res.json({ success: true, authUrl: url });
 });
 
-// Handle OAuth callback
+// Handle OAuth callback - exchange authorization code for tokens
 router.post('/callback', async (req: Request, res: Response) => {
   try {
     const { code } = req.body;
+    // Exchange authorization code for access and refresh tokens
     const tokens = await googlePhotosService.getTokens(code);
     
     res.json({
@@ -31,11 +33,12 @@ router.post('/callback', async (req: Request, res: Response) => {
   }
 });
 
-// List photos from Google Photos (for selection)
+// List photos from Google Photos library (for user selection)
 router.post('/list', async (req: Request, res: Response) => {
   try {
     const { accessToken, limit, pageToken } = req.body;
 
+    // Validate access token
     if (!accessToken) {
       return res.status(400).json({
         success: false,
@@ -43,6 +46,7 @@ router.post('/list', async (req: Request, res: Response) => {
       });
     }
 
+    // Fetch photos from Google Photos API
     const result = await googlePhotosService.listPhotos(
       accessToken,
       limit || 100,
@@ -62,12 +66,13 @@ router.post('/list', async (req: Request, res: Response) => {
   }
 });
 
-// Import selected photos by IDs
+// Import selected photos by their Google Photos IDs
 router.post('/import-selected', async (req: Request, res: Response) => {
   try {
     const { user } = req as AuthenticatedRequest;
     const { accessToken, photoIds } = req.body;
 
+    // Validate access token
     if (!accessToken) {
       return res.status(400).json({
         success: false,
@@ -75,6 +80,7 @@ router.post('/import-selected', async (req: Request, res: Response) => {
       });
     }
 
+    // Validate photoIds array
     if (!photoIds || !Array.isArray(photoIds) || photoIds.length === 0) {
       return res.status(400).json({
         success: false,
@@ -82,6 +88,7 @@ router.post('/import-selected', async (req: Request, res: Response) => {
       });
     }
 
+    // Limit batch size to 25 photos (Google Photos API limit)
     if (photoIds.length > 25) {
       return res.status(400).json({
         success: false,
@@ -89,6 +96,7 @@ router.post('/import-selected', async (req: Request, res: Response) => {
       });
     }
 
+    // Import photos from Google Photos to user's PhotoPin library
     const { imported, errors } = await googlePhotosService.importSelectedPhotos(
       user.uid,
       accessToken,
@@ -108,12 +116,13 @@ router.post('/import-selected', async (req: Request, res: Response) => {
   }
 });
 
-// Import photos (legacy endpoint - kept for backwards compatibility)
+// Import photos from Google Photos (legacy endpoint - kept for backwards compatibility)
 router.post('/import', async (req: Request, res: Response) => {
   try {
     const { user } = req as AuthenticatedRequest;
     const { accessToken, limit } = req.body;
 
+    // Import recent photos from Google Photos
     const { imported, errors } = await googlePhotosService.importPhotos(
       user.uid,
       accessToken,

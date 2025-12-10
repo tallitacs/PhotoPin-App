@@ -162,12 +162,13 @@ REACT_APP_FIREBASE_APP_ID=your-app-id
 
 **Firestore Rules** (`firestore.rules`):
 ```bash
-cd backend
+# Run from project root (where firebase.json is located)
 firebase deploy --only firestore:rules
 ```
 
 **Storage Rules** (`storage.rules`):
 ```bash
+# Run from project root (where firebase.json is located)
 firebase deploy --only storage
 ```
 
@@ -196,7 +197,7 @@ firebase deploy --only storage
 
 ### 8. **Enable Identity Toolkit API (Required for Authentication)**
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Select your Firebase project (`photopin-d0d05`)
+2. Select your Firebase project (e.g., `your-project-id`)
 3. Go to **APIs & Services** > **Library**
 4. Search for "Identity Toolkit API"
 5. Click **Enable**
@@ -617,24 +618,21 @@ Frontend should run on `http://localhost:3000`
 4. **Handle Firebase Credentials**:
    
    **Option A: Use Environment Variables** (Recommended):
-   - Convert `firebase-credentials.json` to environment variables:
+   - The code already supports environment variables! Convert `firebase-credentials.json` to environment variables:
      ```env
-     FIREBASE_CLIENT_EMAIL=your-service-account-email
-     FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
      FIREBASE_PROJECT_ID=your-project-id
+     FIREBASE_PRIVATE_KEY_ID=your-private-key-id
+     FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+     FIREBASE_CLIENT_EMAIL=your-service-account-email@your-project.iam.gserviceaccount.com
+     FIREBASE_CLIENT_ID=your-client-id
+     FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
      ```
-   - Update `backend/src/services/FirebaseService.ts` to use env vars:
-     ```typescript
-     const credentials = {
-       client_email: process.env.FIREBASE_CLIENT_EMAIL!,
-       private_key: process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
-       project_id: process.env.FIREBASE_PROJECT_ID!
-     };
-     ```
+   - **Note**: The `FIREBASE_PRIVATE_KEY` must have `\n` characters (not actual newlines) in the environment variable string.
+   - The code in `backend/src/config/firebaseAdmin.ts` automatically uses environment variables if `firebase-credentials.json` is not found.
 
    **Option B: Use Vercel Secrets**:
    - Upload `firebase-credentials.json` as a secret
-   - Reference it in your code
+   - Or use environment variables as shown in Option A
 
 5. **Deploy**:
    - Click "Deploy"

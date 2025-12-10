@@ -13,9 +13,9 @@ import {
   signInWithEmailAndPassword, 
   signOut 
 } from 'firebase/auth';
-import { auth as firebaseAuth } from '../config/firebase'; // The initialized auth instance
+import { auth as firebaseAuth } from '../config/firebase';
 
-// Define the shape of the auth context
+// Define the shape of the authentication context
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -24,53 +24,56 @@ interface AuthContextType {
   logout: () => Promise<void>;
 }
 
-// Create the context
+// Create the authentication context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Define the provider component
+// Props for the AuthProvider component
 interface AuthProviderProps {
   children: ReactNode;
 }
 
+// Authentication provider component - manages auth state for the app
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Listen for authentication state changes
   useEffect(() => {
-    // Listen for authentication state changes
+    // Subscribe to Firebase auth state changes
     const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
       setUser(user);
       setLoading(false);
     });
 
-    // Cleanup subscription on unmount
+    // Cleanup subscription on component unmount
     return () => unsubscribe();
   }, []);
 
+  // Register a new user account
   const signup = async (email: string, pass: string) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, pass);
-      // NOTE: You might want to call your backend '/api/auth/register' endpoint
-      // here to create a corresponding user profile in your database (Firestore)
       return userCredential.user;
     } catch (error: any) {
       console.error("Signup error:", error);
-      // Re-throw the error so the calling component can handle it
+      // Re-throw error so calling component can handle it
       throw error;
     }
   };
 
+  // Sign in existing user
   const login = async (email: string, pass: string) => {
      try {
       const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, pass);
       return userCredential.user;
     } catch (error: any) {
       console.error("Login error:", error);
-      // Re-throw the error so the calling component can handle it
+      // Re-throw error so calling component can handle it
       throw error;
     }
   };
 
+  // Sign out current user
   const logout = async () => {
     try {
       await signOut(firebaseAuth);
@@ -79,6 +82,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Context value containing auth state and methods
   const value = {
     user,
     loading,
@@ -87,7 +91,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
   };
 
-  // Render children only when not loading
+  // Provide auth context to children
   return (
     <AuthContext.Provider value={value}>
       {children}
@@ -95,9 +99,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 };
 
-// Custom hook to easily consume the context
+// Custom hook to access authentication context
 export const useAuth = () => {
   const context = useContext(AuthContext);
+  // Ensure hook is used within AuthProvider
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }

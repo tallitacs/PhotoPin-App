@@ -5,12 +5,12 @@ import { AuthenticatedRequest } from '../@types/express';
 
 const router = Router();
 
-// Register new user
+// Register a new user account (public endpoint)
 router.post('/register', (req: Request, res: Response) => 
   AuthController.register(req as AuthenticatedRequest, res)
 );
 
-// Verify token endpoint
+// Verify authentication token and return user info
 router.get('/verify', authenticateToken, (req: Request, res: Response) => {
   res.json({
     success: true,
@@ -22,7 +22,7 @@ router.get('/verify', authenticateToken, (req: Request, res: Response) => {
   });
 });
 
-// Get user profile
+// Get authenticated user's profile (requires authentication)
 router.get('/profile', authenticateToken, (req: Request, res: Response) => 
   AuthController.getProfile(req as AuthenticatedRequest, res)
 );

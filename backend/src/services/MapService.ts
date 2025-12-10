@@ -1,9 +1,11 @@
 import { Photo } from '../@types/Photo';
 import { Trip } from '../@types/Trip';
 
+// Service for generating map data from photos and trips
 export class MapService {
   private static instance: MapService;
 
+  // Get singleton instance
   public static getInstance(): MapService {
     if (!MapService.instance) {
       MapService.instance = new MapService();
@@ -11,7 +13,7 @@ export class MapService {
     return MapService.instance;
   }
 
-  // Generate map markers from photos
+  // Convert photos with GPS coordinates to map markers
   generatePhotoMarkers(photos: Photo[]): any[] {
     return photos
       .filter(photo => photo.metadata.gps)
@@ -27,7 +29,7 @@ export class MapService {
       }));
   }
 
-  // Generate trip boundaries for map
+  // Generate map boundaries and centers for trips
   generateTripBoundaries(trips: Trip[]): any[] {
     return trips
       .filter(trip => trip.location)
@@ -43,32 +45,38 @@ export class MapService {
       }));
   }
 
-  // Cluster nearby markers
+  // Cluster nearby markers to reduce map clutter
   clusterMarkers(markers: any[], clusterRadius: number = 50): any[] {
     const clusters: any[] = [];
     const processed = new Set();
 
     markers.forEach(marker => {
+      // Skip if already processed
       if (processed.has(marker.id)) return;
 
+      // Find nearby markers within cluster radius
       const nearby = markers.filter(other =>
         !processed.has(other.id) &&
         this.calculateDistance(marker.position, other.position) <= clusterRadius
       );
 
+      // Add single marker or create cluster
       if (nearby.length === 1) {
         clusters.push(marker);
       } else {
         clusters.push(this.createCluster(nearby));
       }
 
+      // Mark all nearby markers as processed
       nearby.forEach(m => processed.add(m.id));
     });
 
     return clusters;
   }
 
+  // Create a cluster from multiple nearby markers
   private createCluster(markers: any[]): any {
+    // Calculate center point of cluster
     const center = {
       lat: markers.reduce((sum, m) => sum + m.position.lat, 0) / markers.length,
       lng: markers.reduce((sum, m) => sum + m.position.lng, 0) / markers.length
@@ -83,6 +91,7 @@ export class MapService {
     };
   }
 
+  // Calculate distance between two GPS coordinates using Haversine formula
   private calculateDistance(pos1: any, pos2: any): number {
     const R = 6371; // Earth radius in km
     const dLat = this.deg2rad(pos2.lat - pos1.lat);
@@ -92,12 +101,14 @@ export class MapService {
       Math.cos(this.deg2rad(pos1.lat)) * Math.cos(this.deg2rad(pos2.lat)) *
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    return R * c; // Distance in km
   }
 
+  // Convert degrees to radians
   private deg2rad(deg: number): number {
     return deg * (Math.PI / 180);
   }
 }
 
+// Export singleton instance
 export const mapService = MapService.getInstance();

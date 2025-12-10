@@ -15,16 +15,16 @@ import { AlbumsView } from './components/Albums/AlbumsView';
 import { AlbumDetailView } from './components/Albums/AlbumDetailView';
 import { MemoriesView } from './components/Memories/MemoriesView';
 import { FavoritesView } from './components/Favorites/FavoritesView';
-// Google Photos components
+// Google Photos import components
 import { GooglePhotosImport } from './components/Import/GooglePhotosImport';
 import { GoogleCallback } from './components/Import/GoogleCallback';
 
-
+// Main application component with routing
 function App() {
   const { user, loading } = useAuth();
 
+  // Show loading spinner while checking authentication state
   if (loading) {
-    // Show spinner while checking auth
     return (
       <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
         <CircularProgress />
@@ -34,6 +34,7 @@ function App() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      {/* Show navbar only when user is authenticated */}
       {user && <Navbar />}
       <Box
         component="main"
@@ -44,11 +45,11 @@ function App() {
         }}
       >
         <Routes>
-          {/* Public routes */}
+          {/* Public routes - accessible without authentication */}
           <Route path="/login" element={user ? <Navigate to="/" /> : <LoginForm />} />
           <Route path="/signup" element={user ? <Navigate to="/" /> : <SignupForm />} />
 
-          {/* Protected routes */}
+          {/* Protected routes - require authentication */}
           <Route
             path="/"
             element={
@@ -114,7 +115,7 @@ function App() {
             }
           />
 
-          {/* Google Photos import routes */}
+          {/* Google Photos import routes - OAuth callback handler */}
           <Route
             path="/import"
             element={
@@ -132,7 +133,7 @@ function App() {
             }
           />
 
-          {/* Redirect unknown paths */}
+          {/* Catch-all route - redirect unknown paths to home or login */}
           <Route path="*" element={<Navigate to={user ? "/" : "/login"} />} />
         </Routes>
       </Box>

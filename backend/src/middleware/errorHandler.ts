@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 
+// Global error handler middleware - catches all unhandled errors
 export const errorHandler = (
   error: any,
   req: Request,
@@ -8,7 +9,7 @@ export const errorHandler = (
 ) => {
   console.error('Unhandled error:', error);
 
-  // Handle Firebase errors
+  // Handle Firebase authentication errors
   if (error.code && error.code.startsWith('auth/')) {
     return res.status(401).json({
       success: false,
@@ -16,7 +17,7 @@ export const errorHandler = (
     });
   }
 
-  // Handle Firestore errors
+  // Handle Firestore permission errors (code 5 = NOT_FOUND, code 7 = PERMISSION_DENIED)
   if (error.code === 5 || error.code === 7) {
     return res.status(403).json({
       success: false,
@@ -24,7 +25,7 @@ export const errorHandler = (
     });
   }
 
-  // Handle default error
+  // Handle all other errors with generic message
   res.status(500).json({
     success: false,
     error: 'Internal server error'

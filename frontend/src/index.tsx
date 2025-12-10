@@ -7,10 +7,12 @@ import { AuthProvider } from './hooks/useAuth';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
+// Get root element for React rendering
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
+// Render app with providers (ErrorBoundary, ThemeProvider, BrowserRouter, AuthProvider)
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
@@ -25,11 +27,12 @@ root.render(
   </React.StrictMode>
 );
 
-// Register service worker
+// Register service worker for PWA functionality
 serviceWorkerRegistration.register({
   onUpdate: (registration) => {
+    // Handle service worker update
     if (registration && registration.waiting) {
-      // Show update notification
+      // Prompt user to reload for new version
       if (window.confirm('New version available! Reload to update?')) {
         registration.waiting.postMessage({ type: 'SKIP_WAITING' });
         window.location.reload();
