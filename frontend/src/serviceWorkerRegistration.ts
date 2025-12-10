@@ -26,9 +26,9 @@ export function register(config?: Config) {
     }
 
     window.addEventListener('load', () => {
-      // FIX: Use the publicUrl.origin and publicUrl.pathname to construct the swUrl
-      // This ensures it works even if PUBLIC_URL is an empty string.
-      const swUrl = `${publicUrl.origin}${publicUrl.pathname}service-worker.js`;
+      // FIX: Always use root path for service worker, regardless of current route
+      // Service worker must be at root level to work properly
+      const swUrl = `${publicUrl.origin}/service-worker.js`;
 
       if (isLocalhost) {
         // This is running on localhost. Let's check if a service worker still exists or not.
