@@ -57,7 +57,7 @@ app.get('/', (req, res) => {
     message: 'PhotoPin API',
     version: '1.0.0',
     endpoints: {
-      health: '/health',
+      health: '/health or /api/health',
       auth: '/api/auth',
       photos: '/api/photos',
       trips: '/api/trips',
@@ -69,6 +69,15 @@ app.get('/', (req, res) => {
 
 // Health check endpoint - verify API is running
 app.get('/health', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'PhotoPin API is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// API health check endpoint (for consistency with other API routes)
+app.get('/api/health', (req, res) => {
   res.json({ 
     success: true, 
     message: 'PhotoPin API is running',
