@@ -20,7 +20,7 @@ const defaultCenter = {
   lng: 0,
 };
 
-// Libraries for Google Maps API - must be constant to avoid reload warnings
+// Libraries for Google Maps API 
 const mapLibraries: ("marker")[] = ["marker"];
 
 export const HomePage: React.FC = () => {
@@ -53,16 +53,16 @@ export const HomePage: React.FC = () => {
       console.warn('Google Maps not loaded yet, cannot geocode');
       return null;
     }
-    
+
     try {
       const geocoder = new window.google.maps.Geocoder();
       return new Promise((resolve) => {
         geocoder.geocode(
-          { 
+          {
             address,
             // Use componentRestrictions to improve accuracy
             // This helps when geocoding city+country to get the city, not country center
-          }, 
+          },
           (results, status) => {
             if (status === 'OK' && results && results[0]) {
               const location = results[0].geometry.location;
@@ -88,32 +88,32 @@ export const HomePage: React.FC = () => {
   // Fetch photos with location data for the map
   useEffect(() => {
     let isMounted = true; // Track if component is still mounted to prevent state updates after unmount
-    
+
     const fetchMapPins = async () => {
       try {
         setMapLoading(true);
         const data = await api.getMapPins(); // Fetch all photos with location data
         console.log('Map pins API response:', data);
         if (!isMounted) return;
-        
+
         if (data.success && data.photos) {
           console.log('Total photos received from API:', data.photos.length);
           console.log('Sample photo data:', data.photos[0]);
           // Process photos: those with GPS and those needing geocoding
           const photosWithGPS: Photo[] = []; // Photos that already have GPS coordinates
           const photosNeedingGeocoding: Photo[] = []; // Photos with address/city/country but no GPS
-          
+
           data.photos.forEach((p: Photo) => {
             const hasGPS = !!(p.metadata?.gps?.latitude && p.metadata?.gps?.longitude);
             const hasLocation = !!(p.location && (p.location.address || p.location.city || p.location.country));
-            
+
             console.log(`Photo ${p.id} (${p.fileName}):`, {
               hasGPS,
               hasLocation,
               gps: p.metadata?.gps,
               location: p.location
             });
-            
+
             if (hasGPS) {
               photosWithGPS.push(p); // Already has coordinates, can show immediately
             } else if (hasLocation && p.location) {
@@ -135,7 +135,7 @@ export const HomePage: React.FC = () => {
           // Set photos with GPS immediately
           setMapPhotos(photosWithGPS);
           setFilteredMapPhotos(photosWithGPS);
-          
+
           // Auto-center and zoom map to show all photos
           if (photosWithGPS.length > 0) {
             const bounds = new window.google.maps.LatLngBounds();
@@ -147,7 +147,7 @@ export const HomePage: React.FC = () => {
             });
             // Fit bounds will be handled after geocoding completes
           }
-          
+
           console.log('Set mapPhotos to:', photosWithGPS.length, 'photos');
 
           // Geocode addresses for photos without GPS
@@ -162,7 +162,7 @@ export const HomePage: React.FC = () => {
               // 2. Just Country -> use capital city
               // 3. Full address (most precise overall)
               const addressParts: string[] = [];
-              
+
               // Priority 1: Add city first (most specific location)
               if (photo.location?.city) {
                 addressParts.push(photo.location.city);
@@ -176,7 +176,7 @@ export const HomePage: React.FC = () => {
                 // Prepend address for most specific location
                 addressParts.unshift(photo.location.address);
               }
-              
+
               // Special handling: If only country (no city), geocode to capital city
               let geocodeQuery = '';
               if (addressParts.length > 0) {
@@ -189,16 +189,16 @@ export const HomePage: React.FC = () => {
                   geocodeQuery = addressParts.join(', ');
                 }
               }
-              
+
               // Geocode with what we have:
               // - City + Country = precise city location
               // - Just Country = capital city (better than country center)
               // - Address + City + Country = most precise
               if (geocodeQuery) {
                 const cacheKey = geocodeQuery.toLowerCase(); // Use lowercase for cache key
-                
+
                 console.log('Geocoding address for photo:', photo.id, geocodeQuery);
-                
+
                 // Check cache first to avoid duplicate API calls
                 let coords = geocodeMap.get(cacheKey);
                 if (!coords) {
@@ -213,7 +213,7 @@ export const HomePage: React.FC = () => {
                 } else {
                   console.log('Using cached coordinates for:', geocodeQuery);
                 }
-                
+
                 if (coords) {
                   // Save geocoded coordinates to the database so they persist
                   try {
@@ -232,7 +232,7 @@ export const HomePage: React.FC = () => {
                     console.error('Failed to save geocoded coordinates:', err);
                     // Continue anyway - we'll still show the pin for this session
                   }
-                  
+
                   // Add GPS coordinates to photo for display
                   const photoWithGPS = {
                     ...photo,
@@ -274,7 +274,7 @@ export const HomePage: React.FC = () => {
             } else {
               console.log('No photos were geocoded successfully');
             }
-            
+
             // After all photos are loaded (with GPS or geocoded), fit map to bounds
             const allPhotos = [...photosWithGPS, ...geocoded];
             if (allPhotos.length > 0 && isLoaded && window.google?.maps) {
@@ -288,8 +288,8 @@ export const HomePage: React.FC = () => {
               // Store bounds to use in map component
               setTimeout(() => {
                 // Trigger map bounds update
-                if (bounds.getNorthEast().lat() !== bounds.getSouthWest().lat() || 
-                    bounds.getNorthEast().lng() !== bounds.getSouthWest().lng()) {
+                if (bounds.getNorthEast().lat() !== bounds.getSouthWest().lat() ||
+                  bounds.getNorthEast().lng() !== bounds.getSouthWest().lng()) {
                   const center = bounds.getCenter();
                   setMapCenter({ lat: center.lat(), lng: center.lng() });
                   // Calculate appropriate zoom level
@@ -317,11 +317,11 @@ export const HomePage: React.FC = () => {
         setMapLoading(false);
       }
     };
-    
+
     if (isLoaded) {
       fetchMapPins();
     }
-    
+
     // Also refetch when window regains focus (user might have updated photos in another tab)
     const handleFocus = () => {
       if (isLoaded && isMounted) {
@@ -329,7 +329,7 @@ export const HomePage: React.FC = () => {
       }
     };
     window.addEventListener('focus', handleFocus);
-    
+
     // Also listen for storage events (when photos are updated)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'photo-updated' && isLoaded && isMounted) {
@@ -338,14 +338,14 @@ export const HomePage: React.FC = () => {
       }
     };
     window.addEventListener('storage', handleStorageChange);
-    
+
     // Poll for updates every 60 seconds (much less frequent to avoid rate limiting)
     const pollInterval = setInterval(() => {
       if (isLoaded && isMounted) {
         fetchMapPins();
       }
     }, 60000); // Changed from 5000ms to 60000ms (1 minute)
-    
+
     // Cleanup: remove event listeners and clear interval on unmount
     return () => {
       isMounted = false;
@@ -389,7 +389,7 @@ export const HomePage: React.FC = () => {
       // Calculate bounds for all results
       const bounds = new window.google.maps.LatLngBounds();
       let hasValidBounds = false;
-      
+
       filtered.forEach(photo => {
         const gps = photo.metadata?.gps;
         if (gps?.latitude && gps?.longitude) {
@@ -397,16 +397,16 @@ export const HomePage: React.FC = () => {
           hasValidBounds = true;
         }
       });
-      
+
       if (hasValidBounds) {
         // Calculate center
         const center = bounds.getCenter();
         setMapCenter({ lat: center.lat(), lng: center.lng() });
-        
+
         // Always use zoom level 7 for search results to show city name
         const targetZoom = 7;
         setMapZoom(targetZoom);
-        
+
         // If map instance is available, also set zoom directly on the map
         if (mapInstance) {
           setTimeout(() => {
@@ -426,16 +426,16 @@ export const HomePage: React.FC = () => {
 
   // Fit map bounds when photos are loaded (fallback if AdvancedMarkerElement bounds fit doesn't work)
   useEffect(() => {
-    console.log('Bounds fit effect triggered:', { 
-      hasMapInstance: !!mapInstance, 
-      photoCount: filteredMapPhotos.length, 
-      isLoaded 
+    console.log('Bounds fit effect triggered:', {
+      hasMapInstance: !!mapInstance,
+      photoCount: filteredMapPhotos.length,
+      isLoaded
     });
-    
+
     if (mapInstance && filteredMapPhotos.length > 0 && isLoaded && window.google?.maps) {
       const bounds = new window.google.maps.LatLngBounds();
       let hasValidBounds = false;
-      
+
       // Build bounds from all photos with GPS coordinates
       filteredMapPhotos.forEach(photo => {
         const gps = photo.metadata?.gps;
@@ -445,7 +445,7 @@ export const HomePage: React.FC = () => {
           console.log('Added to bounds:', gps.latitude, gps.longitude);
         }
       });
-      
+
       if (hasValidBounds) {
         try {
           // Add padding so markers aren't at the edge
@@ -474,10 +474,10 @@ export const HomePage: React.FC = () => {
     const createAdvancedMarkers = async () => {
       try {
         console.log('Creating AdvancedMarkerElement markers for', filteredMapPhotos.length, 'photos');
-        
+
         // Import the marker library (required for AdvancedMarkerElement)
         const { AdvancedMarkerElement } = await window.google.maps.importLibrary('marker') as google.maps.MarkerLibrary;
-        
+
         // Clear existing markers before creating new ones
         advancedMarkers.forEach(marker => {
           marker.map = null;
@@ -486,16 +486,16 @@ export const HomePage: React.FC = () => {
 
         // Group photos by location (round coordinates to group nearby photos)
         const locationGroups = new Map<string, Photo[]>();
-        
+
         filteredMapPhotos.forEach((photo) => {
           const gps = photo.metadata?.gps;
           if (!gps || gps.latitude === undefined || gps.longitude === undefined) return;
-          
+
           // Round to 4 decimal places (~11 meters precision) to group nearby photos
           const roundedLat = Math.round(gps.latitude * 10000) / 10000;
           const roundedLng = Math.round(gps.longitude * 10000) / 10000;
           const locationKey = `${roundedLat},${roundedLng}`;
-          
+
           if (!locationGroups.has(locationKey)) {
             locationGroups.set(locationKey, []);
           }
@@ -507,12 +507,12 @@ export const HomePage: React.FC = () => {
         // Create markers for each location group
         const newMarkers: google.maps.marker.AdvancedMarkerElement[] = [];
         const bounds = new window.google.maps.LatLngBounds();
-        
+
         locationGroups.forEach((photos, locationKey) => {
           const firstPhoto = photos[0];
           const gps = firstPhoto.metadata?.gps!;
           const position = { lat: gps.latitude, lng: gps.longitude };
-          
+
           // Create content for marker using custom orange teardrop pin icon
           const content = document.createElement('div');
           content.style.cssText = `
@@ -522,20 +522,20 @@ export const HomePage: React.FC = () => {
             cursor: pointer;
             filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
           `;
-          
+
           // Create SVG for teardrop pin icon
           const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
           svg.setAttribute('width', '32');
           svg.setAttribute('height', '40');
           svg.setAttribute('viewBox', '0 0 32 40');
           svg.style.cssText = 'position: absolute; top: 0; left: 0;';
-          
+
           // Teardrop shape (path)
           const pinPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           pinPath.setAttribute('d', 'M16 0C10.477 0 6 4.477 6 10c0 6 10 18 10 18s10-12 10-18c0-5.523-4.477-10-10-10z');
           pinPath.setAttribute('fill', '#ff4e00');
           svg.appendChild(pinPath);
-          
+
           // White circle in center
           const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
           circle.setAttribute('cx', '16');
@@ -543,7 +543,7 @@ export const HomePage: React.FC = () => {
           circle.setAttribute('r', '6');
           circle.setAttribute('fill', 'white');
           svg.appendChild(circle);
-          
+
           // Add count text if multiple photos
           if (photos.length > 1) {
             const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -556,26 +556,26 @@ export const HomePage: React.FC = () => {
             text.textContent = photos.length.toString();
             svg.appendChild(text);
           }
-          
+
           content.appendChild(svg);
-          
+
           const marker = new AdvancedMarkerElement({
             map: mapInstance,
             position: position,
             content: content,
-            title: photos.length === 1 
+            title: photos.length === 1
               ? (photos[0].displayName || photos[0].fileName)
               : `${photos.length} photos at this location`
           });
-          
+
           // Add click listener to toggle side panel with photos
           marker.addListener('click', () => {
             console.log('Advanced marker clicked:', locationKey, photos.length, 'photos');
-            
+
             // Check if this location is already selected
-            if (selectedLocation && 
-                Math.abs(selectedLocation.lat - position.lat) < 0.0001 && 
-                Math.abs(selectedLocation.lng - position.lng) < 0.0001) {
+            if (selectedLocation &&
+              Math.abs(selectedLocation.lat - position.lat) < 0.0001 &&
+              Math.abs(selectedLocation.lng - position.lng) < 0.0001) {
               // Same location clicked - close the panel
               setSelectedLocation(null);
             } else {
@@ -583,15 +583,15 @@ export const HomePage: React.FC = () => {
               setSelectedLocation({ ...position, photos });
             }
           });
-          
+
           newMarkers.push(marker);
           bounds.extend(new window.google.maps.LatLng(gps.latitude, gps.longitude));
           console.log('Created AdvancedMarkerElement at:', position, 'for', photos.length, 'photos');
         });
-        
+
         setAdvancedMarkers(newMarkers);
         console.log('Total AdvancedMarkerElement markers created:', newMarkers.length);
-        
+
         // Fit bounds to show all markers
         if (locationGroups.size > 0) {
           mapInstance.fitBounds(bounds, 50);
@@ -603,7 +603,7 @@ export const HomePage: React.FC = () => {
     };
 
     createAdvancedMarkers();
-    
+
     // Cleanup: remove markers when component unmounts or dependencies change
     return () => {
       advancedMarkers.forEach(marker => {
@@ -624,43 +624,43 @@ export const HomePage: React.FC = () => {
 
         {/* Search bar */}
         <Box sx={{ mb: 2 }}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                placeholder="Search photos by name, tags, camera..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
-                  endAdornment: searchTerm && (
-                    <InputAdornment position="end">
-                      <IconButton
-                        size="small"
-                        onClick={() => setSearchTerm('')}
-                        edge="end"
-                      >
-                        ×
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              {searchTerm && (
-                <Box sx={{ mt: 1, fontSize: '0.875rem', color: 'text.secondary' }}>
-                  Found {filteredMapPhotos.length} photo{filteredMapPhotos.length !== 1 ? 's' : ''}
-                </Box>
-              )}
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Search photos by name, tags, camera..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+              endAdornment: searchTerm && (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={() => setSearchTerm('')}
+                    edge="end"
+                  >
+                    ×
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+          {searchTerm && (
+            <Box sx={{ mt: 1, fontSize: '0.875rem', color: 'text.secondary' }}>
+              Found {filteredMapPhotos.length} photo{filteredMapPhotos.length !== 1 ? 's' : ''}
             </Box>
+          )}
+        </Box>
 
-            {loadError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                Error loading Google Maps. Please check your API key.
-              </Alert>
-            )}
+        {loadError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            Error loading Google Maps. Please check your API key.
+          </Alert>
+        )}
 
         {(!isLoaded || mapLoading) ? (
           <Box display="flex" justifyContent="center" alignItems="center" sx={{ flex: 1, minHeight: '500px' }}>
@@ -770,75 +770,75 @@ export const HomePage: React.FC = () => {
             {/* Map */}
             <Box sx={{ flex: 1, position: 'relative', minHeight: '500px', transition: 'margin-left 0.3s' }}>
               <GoogleMap
-                  mapContainerStyle={{
-                    ...mapContainerStyle,
-                    marginLeft: selectedLocation ? '0' : '0',
-                  }}
-                  center={mapCenter}
-                  zoom={mapZoom}
-                  onLoad={(map) => {
-                    setMapInstance(map); // Save map instance for programmatic control
-                    console.log('Map loaded, instance saved');
-                    
-                    // Immediately try to fit bounds if we have photos (before AdvancedMarkerElement markers are created)
-                    if (filteredMapPhotos.length > 0) {
-                      setTimeout(() => {
-                        const bounds = new window.google.maps.LatLngBounds();
-                        let hasValidBounds = false;
-                        
-                        filteredMapPhotos.forEach(photo => {
-                          const gps = photo.metadata?.gps;
-                          if (gps?.latitude !== undefined && gps?.longitude !== undefined) {
-                            bounds.extend(new window.google.maps.LatLng(gps.latitude, gps.longitude));
-                            hasValidBounds = true;
-                          }
-                        });
-                        
-                        if (hasValidBounds) {
-                          map.fitBounds(bounds, 50);
-                          console.log('Map bounds fitted on load:', filteredMapPhotos.length, 'photos');
-                        }
-                      }, 500); // Small delay to ensure map is fully rendered
-                    }
-                  }}
-                  options={{
-                    mapId: 'PHOTOPIN_MAP_ID', // Required for AdvancedMarkerElement
-                    mapTypeControl: true,
-                    streetViewControl: true,
-                    fullscreenControl: true,
-                    minZoom: 2, // Prevent zooming out beyond world view
-                    maxZoom: 20, // Allow zooming in close
-                    restriction: {
-                      latLngBounds: {
-                        north: 85,
-                        south: -85,
-                        east: 180,
-                        west: -180,
-                      },
-                      strictBounds: false, // Allow slight overflow for better UX
-                    },
-                  }}
-                >
-                  {/* Markers are created using AdvancedMarkerElement in useEffect - no JSX markers needed */}
-                </GoogleMap>
-              </Box>
-            </Box>
-          )}
+                mapContainerStyle={{
+                  ...mapContainerStyle,
+                  marginLeft: selectedLocation ? '0' : '0',
+                }}
+                center={mapCenter}
+                zoom={mapZoom}
+                onLoad={(map) => {
+                  setMapInstance(map); // Save map instance for programmatic control
+                  console.log('Map loaded, instance saved');
 
-          {mapPhotos.length === 0 && !mapLoading && (
-            <Box sx={{ mt: 2, textAlign: 'center', color: 'text.secondary' }}>
-              <Typography variant="body2">
-                No photos with location data yet. Upload photos with GPS information to see them on the map.
-              </Typography>
+                  // Immediately try to fit bounds if we have photos (before AdvancedMarkerElement markers are created)
+                  if (filteredMapPhotos.length > 0) {
+                    setTimeout(() => {
+                      const bounds = new window.google.maps.LatLngBounds();
+                      let hasValidBounds = false;
+
+                      filteredMapPhotos.forEach(photo => {
+                        const gps = photo.metadata?.gps;
+                        if (gps?.latitude !== undefined && gps?.longitude !== undefined) {
+                          bounds.extend(new window.google.maps.LatLng(gps.latitude, gps.longitude));
+                          hasValidBounds = true;
+                        }
+                      });
+
+                      if (hasValidBounds) {
+                        map.fitBounds(bounds, 50);
+                        console.log('Map bounds fitted on load:', filteredMapPhotos.length, 'photos');
+                      }
+                    }, 500); // Small delay to ensure map is fully rendered
+                  }
+                }}
+                options={{
+                  mapId: 'PHOTOPIN_MAP_ID', // Required for AdvancedMarkerElement
+                  mapTypeControl: true,
+                  streetViewControl: true,
+                  fullscreenControl: true,
+                  minZoom: 2, // Prevent zooming out beyond world view
+                  maxZoom: 20, // Allow zooming in close
+                  restriction: {
+                    latLngBounds: {
+                      north: 85,
+                      south: -85,
+                      east: 180,
+                      west: -180,
+                    },
+                    strictBounds: false, // Allow slight overflow for better UX
+                  },
+                }}
+              >
+                {/* Markers are created using AdvancedMarkerElement in useEffect - no JSX markers needed */}
+              </GoogleMap>
             </Box>
-          )}
-          {mapPhotos.length > 0 && !mapLoading && (
-            <Box sx={{ mt: 2, textAlign: 'center', color: 'text.secondary' }}>
-              <Typography variant="body2">
-                Showing {filteredMapPhotos.length} photo{filteredMapPhotos.length !== 1 ? 's' : ''} on the map
-              </Typography>
-            </Box>
-          )}
+          </Box>
+        )}
+
+        {mapPhotos.length === 0 && !mapLoading && (
+          <Box sx={{ mt: 2, textAlign: 'center', color: 'text.secondary' }}>
+            <Typography variant="body2">
+              No photos with location data yet. Upload photos with GPS information to see them on the map.
+            </Typography>
+          </Box>
+        )}
+        {mapPhotos.length > 0 && !mapLoading && (
+          <Box sx={{ mt: 2, textAlign: 'center', color: 'text.secondary' }}>
+            <Typography variant="body2">
+              Showing {filteredMapPhotos.length} photo{filteredMapPhotos.length !== 1 ? 's' : ''} on the map
+            </Typography>
+          </Box>
+        )}
       </Paper>
 
       {/* Full screen photo viewer */}

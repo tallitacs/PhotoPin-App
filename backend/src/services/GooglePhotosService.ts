@@ -24,12 +24,9 @@ export class GooglePhotosService {
   // Generate OAuth2 authorization URL for user consent
   getAuthUrl(): string {
     // Request read-only access to Google Photos library
-    // photoslibrary.readonly - for accessing user's own photos (required)
-    // photoslibrary.sharing - for accessing shared albums/photos (optional)
     const scopes = [
       'https://www.googleapis.com/auth/photoslibrary.readonly',
-      // Uncomment the line below if you want to support shared albums
-      // 'https://www.googleapis.com/auth/photoslibrary.sharing'
+      'https://www.googleapis.com/auth/photoslibrary.sharing'
     ];
 
     const redirectUri = process.env.GOOGLE_PHOTOS_REDIRECT_URI;
@@ -40,14 +37,11 @@ export class GooglePhotosService {
     });
 
     // Generate authorization URL with offline access
-    // include_granted_scopes: false - Don't include previously granted scopes, force fresh consent
-    // prompt: 'consent' - Always show consent screen
-    // access_type: 'offline' - Request refresh token
     const authUrl = this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: scopes,
-      prompt: 'consent', // Force consent screen to show
-      include_granted_scopes: false // Force fresh consent, don't use previously granted scopes
+      prompt: 'consent',
+      include_granted_scopes: false
     });
 
     console.log('Generated Auth URL:', authUrl);
@@ -61,21 +55,21 @@ export class GooglePhotosService {
       console.log('Exchanging authorization code for tokens...');
       // Exchange code for tokens
       const { tokens } = await this.oauth2Client.getToken(code);
-      
+
       // Verify token scopes
       if (tokens.access_token) {
         try {
           const tokenInfo = await this.verifyToken(tokens.access_token);
           if (tokenInfo) {
             console.log('Token scopes after exchange:', tokenInfo.scope);
-            
+
             // Validate that the token has the required Google Photos scope
             const scopes = tokenInfo.scope?.split(' ') || [];
-            const hasPhotosScope = scopes.some((scope: string) => 
-              scope.includes('photoslibrary.readonly') || 
+            const hasPhotosScope = scopes.some((scope: string) =>
+              scope.includes('photoslibrary.readonly') ||
               scope.includes('photoslibrary.sharing')
             );
-            
+
             if (!hasPhotosScope) {
               console.error('❌ CRITICAL: Token does NOT have Google Photos scope!');
               console.error('Token scopes:', scopes);
@@ -88,12 +82,12 @@ export class GooglePhotosService {
         } catch (verifyError: any) {
           // If verification fails, log but don't fail - the API call will tell us if there's a problem
           if (verifyError.message && verifyError.message.includes('required Google Photos permissions')) {
-            throw verifyError; // Re-throw if it's our validation error
+            throw verifyError;
           }
           console.warn('Could not verify token scopes:', verifyError);
         }
       }
-      
+
       console.log('Token exchange successful:', {
         hasAccessToken: !!tokens.access_token,
         hasRefreshToken: !!tokens.refresh_token,
@@ -101,7 +95,7 @@ export class GooglePhotosService {
         tokenType: tokens.token_type,
         scope: tokens.scope
       });
-      
+
       // Set credentials for future API calls
       this.oauth2Client.setCredentials(tokens);
       return tokens;
@@ -150,14 +144,14 @@ export class GooglePhotosService {
   async listPhotos(accessToken: string, limit: number = 100, pageToken?: string) {
     try {
       console.log('Fetching photos list from Google Photos API...');
-      
+
       // Verify token has the right scopes (for debugging, but don't fail if verification fails)
       const tokenInfo = await this.verifyToken(accessToken);
       if (tokenInfo) {
         const scopes = tokenInfo.scope?.split(' ') || [];
         console.log('📋 Token has scopes:', scopes);
-        const hasPhotosScope = scopes.some((scope: string) => 
-          scope.includes('photoslibrary.readonly') || 
+        const hasPhotosScope = scopes.some((scope: string) =>
+          scope.includes('photoslibrary.readonly') ||
           scope.includes('photoslibrary.sharing') ||
           scope.includes('photospicker')
         );
@@ -171,11 +165,11 @@ export class GooglePhotosService {
       } else {
         console.log('ℹ️ Could not verify token scopes, but continuing with API call...');
       }
-      
+
       const requestBody: any = {
         pageSize: Math.min(limit, 100) // API max is 100
       };
-      
+
       if (pageToken) {
         requestBody.pageToken = pageToken;
       }
@@ -230,32 +224,32 @@ export class GooglePhotosService {
         method: error.config?.method
       };
       console.error('📋 Full error details:', JSON.stringify(errorDetails, null, 2));
-      
+
       // Log the full error response for debugging
       if (error.response?.data) {
         console.error('🔍 Full error response from Google:', JSON.stringify(error.response.data, null, 2));
       }
-      
+
       if (error.response?.status === 401) {
         throw new Error('Your Google session has expired. Please disconnect and reconnect to Google Photos.');
-      } else       if (error.response?.status === 403) {
+      } else if (error.response?.status === 403) {
         const errorData = error.response?.data;
         const errorMessage = errorData?.error?.message || 'Access denied';
         const errorStatus = errorData?.error?.status || 'UNKNOWN';
-        
+
         console.error('🚫 403 Forbidden Error Details:');
         console.error('   Error message:', errorMessage);
         console.error('   Error status:', errorStatus);
         console.error('   Full error object:', JSON.stringify(errorData, null, 2));
-        
+
         // Check token scopes before throwing error
         try {
           const tokenInfo = await this.verifyToken(accessToken);
           if (tokenInfo) {
             console.error('   Token scopes:', tokenInfo.scope);
             const scopes = tokenInfo.scope?.split(' ') || [];
-            const hasPhotosScope = scopes.some((scope: string) => 
-              scope.includes('photoslibrary.readonly') || 
+            const hasPhotosScope = scopes.some((scope: string) =>
+              scope.includes('photoslibrary.readonly') ||
               scope.includes('photoslibrary.sharing')
             );
             if (!hasPhotosScope) {
@@ -266,15 +260,15 @@ export class GooglePhotosService {
         } catch (verifyErr) {
           console.warn('   Could not verify token scopes:', verifyErr);
         }
-        
+
         // Provide more specific error messages
-        if (errorMessage.includes('insufficient authentication scopes') || 
-            errorMessage.includes('Insufficient Permission') ||
-            errorMessage.includes('insufficient_scope') ||
-            errorStatus === 'PERMISSION_DENIED') {
+        if (errorMessage.includes('insufficient authentication scopes') ||
+          errorMessage.includes('Insufficient Permission') ||
+          errorMessage.includes('insufficient_scope') ||
+          errorStatus === 'PERMISSION_DENIED') {
           throw new Error(`Access token does not have required permissions (${errorStatus}). The token may have been issued with different scopes. Please: 1) Disconnect, 2) Clear browser cache/cookies for Google, 3) Reconnect and grant ALL permissions when prompted. Please disconnect and reconnect to Google Photos.`);
-        } else if (errorMessage.includes('Access denied') || 
-                   errorMessage.includes('Forbidden')) {
+        } else if (errorMessage.includes('Access denied') ||
+          errorMessage.includes('Forbidden')) {
           throw new Error(`Access denied (${errorStatus}): ${errorMessage}. Please disconnect and reconnect to Google Photos.`);
         } else {
           // Include the actual error message from Google
@@ -284,7 +278,7 @@ export class GooglePhotosService {
         const errorData = error.response?.data;
         throw new Error(`Invalid request: ${errorData?.error?.message || error.message}`);
       }
-      
+
       // Re-throw with original message for other errors
       throw new Error(error.response?.data?.error?.message || error.message || 'Failed to fetch photos from Google Photos');
     }
@@ -294,7 +288,7 @@ export class GooglePhotosService {
   async importSelectedPhotos(userId: string, accessToken: string, photoIds: string[]) {
     try {
       console.log(`Importing ${photoIds.length} selected photos from Google Photos...`);
-      
+
       if (photoIds.length === 0) {
         return { imported: [], errors: [] };
       }
@@ -417,9 +411,8 @@ export class GooglePhotosService {
     try {
       console.log('Importing photos from Google Photos...');
       console.log('Access token (first 20 chars):', accessToken?.substring(0, 20) + '...');
-      
+
       // Google Photos API requires using searchMediaItems endpoint
-      // We'll search for all photos (no filters) to get recent photos
       const requestBody = {
         pageSize: Math.min(limit, 100) // API max is 100
       };
@@ -449,7 +442,7 @@ export class GooglePhotosService {
           headers: apiError.response?.headers
         };
         console.error('Google Photos API error:', JSON.stringify(errorDetails, null, 2));
-        
+
         // Provide more specific error messages
         if (apiError.response?.status === 403) {
           const errorData = apiError.response?.data;

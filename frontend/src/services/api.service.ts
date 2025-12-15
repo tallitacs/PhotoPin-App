@@ -4,7 +4,6 @@ import { Photo, PhotoMetadata, PhotosResponse, TimelineResponse } from '../types
 import { Trip } from '../types/trip.types';
 
 // Create axios instance with base API URL
-// Default to http://localhost:5000/api if REACT_APP_API_URL is not set
 const apiBaseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 if (!process.env.REACT_APP_API_URL) {
@@ -73,9 +72,8 @@ api.interceptors.response.use(
   }
 );
 
-// ==========================================
+
 // Photo API Endpoints
-// ==========================================
 
 // Upload multiple photos using FormData
 export const uploadPhotos = async (files: File[], tripId?: string) => {
@@ -176,9 +174,8 @@ export const bulkDeletePhotos = async (photoIds: string[]) => {
   return data;
 };
 
-// ==========================================
+
 // Trip API Endpoints
-// ==========================================
 
 // Get all trips for current user
 export const getUserTrips = async () => {
@@ -241,9 +238,8 @@ export const autoClusterPhotos = async (options?: {
   return data;
 };
 
-// ==========================================
+
 // Google Photos API Endpoints
-// ==========================================
 
 // Get OAuth2 authorization URL for Google Photos
 export const getGoogleAuthUrl = async () => {

@@ -26,11 +26,11 @@ app.use(helmet({
   contentSecurityPolicy: false, // Disable CSP for API (can be configured more strictly later)
 }));
 
-// Rate limiting - prevent abuse
-// More lenient in development mode
+// Rate limiting - to prevent abuse and DDOS attacks
+// More relaxed in development mode to allow for testing and development
 const limiter = rateLimit({
   windowMs: environment.security.rateLimitWindowMs,
-  max: environment.nodeEnv === 'development' 
+  max: environment.nodeEnv === 'development'
     ? environment.security.rateLimitMaxRequests * 10 // 10x more lenient in dev
     : environment.security.rateLimitMaxRequests,
   message: {
@@ -52,8 +52,8 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Root endpoint - API information
 app.get('/', (req, res) => {
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     message: 'PhotoPin API',
     version: '1.0.0',
     endpoints: {
@@ -69,17 +69,8 @@ app.get('/', (req, res) => {
 
 // Health check endpoint - verify API is running
 app.get('/health', (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'PhotoPin API is running',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// API health check endpoint (for consistency with other API routes)
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     message: 'PhotoPin API is running',
     timestamp: new Date().toISOString()
   });
@@ -107,7 +98,6 @@ app.use('*', (req, res) => {
 const PORT = environment.port;
 
 // Only start the server if not running on Vercel (serverless environment)
-// Vercel sets VERCEL environment variable automatically
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`🚀 PhotoPin API running on port ${PORT}`);
